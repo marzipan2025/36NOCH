@@ -46,4 +46,5 @@
 
 - NotchNook과 같이 켤지: 같이 켜면 마우스를 올렸을 때 두 앱이 동시에 열림. 36NOCH를 작게 뜸 전용으로 두거나, 하나를 끄거나
 - 저장소 공개 여부(지금은 private)
+- 최소 macOS를 26으로 올릴지: Liquid Glass(`glassEffect`)는 macOS 26+. 지금은 유리 실험만 `@available(macOS 26)`로 막아 둠. 두 맥 모두 26 이상
 - ~~회사 맥에 노치가 있는지, macOS 버전~~ → 노치 있음, macOS 27.0.1 (RESEARCH §1.3)
