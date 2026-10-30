@@ -103,6 +103,10 @@ final class CalendarFeed: ObservableObject {
                 return Array(calendars)
             }
         }
+        // 집 맥처럼 기본 캘린더 이름이 이메일이 아니라 사람 이름("Byeongsu Kim")이면 위에서 못 찾는다.
+        // 캘린더가 있는 "Google" 계정이 하나뿐이면 그 계정을 쓴다.
+        let google = store.sources.filter { $0.title == "Google" && !$0.calendars(for: .event).isEmpty }
+        if google.count == 1 { return Array(google[0].calendars(for: .event)) }
         return []
     }
 

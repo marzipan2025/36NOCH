@@ -268,6 +268,8 @@ struct DropPanelView: View {
                     .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
+            .focusable(false)   // 키 창이 되면 첫 버튼에 파란 포커스 테두리가 잡히므로 끈다
+            .focusEffectDisabled()
             .offset(x: x)
             .allowsHitTesting(grown)
         }
