@@ -1,7 +1,8 @@
 import SwiftUI
 
 /// 팝업 안 계정 고르기. 시계 자리(팝업 위쪽)에 맥 캘린더 앱의 계정 목록을 띄우고, 누르면 바로 고른다.
-/// 계정 추가·나중에 같은 버튼은 두지 않는다(나중에 설정에 넣을 것). 팝업 아래 유리는 평소처럼 투명하다.
+/// 계정 추가·나중에 같은 버튼은 두지 않는다(나중에 설정에 넣을 것). 팝업 아래 유리는 평소처럼 투명하고,
+/// 계정마다 둥근 검정 상자(0.1, 롤오버 0.8)에 담아서 투명한 곳까지 목록을 내려도 읽힌다.
 struct AccountPicker: View {
     @ObservedObject var calendar: CalendarFeed
     let textSize: CGFloat
@@ -54,7 +55,7 @@ struct AccountPicker: View {
             .onTapGesture(perform: action)
     }
 
-    /// 계정 한 줄: 이름(지금 쓰는 계정이면 금색 점) 아래에 캘린더 이름들. 마우스를 올리면 12pt 둥근 상자가 보인다.
+    /// 계정 한 칸: 12pt 둥근 상자(검정 0.1, 롤오버 0.8) 안에 이름(지금 쓰는 계정이면 금색 점)과 캘린더 이름들.
     private func row(_ account: CalendarFeed.Account) -> some View {
         let current = account.id == calendar.selectedID
         return Button { calendar.choose(account) } label: {
@@ -77,7 +78,7 @@ struct AccountPicker: View {
             .padding(.vertical, 7)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(RoundedRectangle(cornerRadius: 12)
-                .fill(Color.white.opacity(hovered == account.id ? 0.1 : 0)))
+                .fill(Color.black.opacity(hovered == account.id ? 0.8 : 0.1)))
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)

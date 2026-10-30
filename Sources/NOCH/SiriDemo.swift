@@ -346,8 +346,8 @@ struct DropPanelView: View {
                 // 계정을 고르는 중이면 시계 자리에 계정 목록(AccountPicker)
                 Group { if calendar.picking {
                     AccountPicker(calendar: calendar, textSize: tuning.textSize)
-                        // 아래 투명한 유리(검정 덮개가 끝나는 lift 아래)에는 목록이 내려가지 않게
-                        .frame(height: max(0, popupSize.height - tuning.textTop - tuning.lift))
+                        // 계정마다 검정 상자에 담기므로 아래 투명한 유리까지 내려가도 된다. 아래 여백은 위(textTop)와 같게.
+                        .frame(height: max(0, popupSize.height - tuning.textTop * 2))
                 } else {
                 TimelineView(.periodic(from: Date(timeIntervalSinceReferenceDate: Date().timeIntervalSinceReferenceDate.rounded(.down)), by: 0.5)) { context in
                     let now = context.date
@@ -975,7 +975,7 @@ extension SiriDemo: NSMenuDelegate {
 }
 
 extension DropTuning {
-    /// 지금 팝업 높이. 캘린더 계정을 고르는 동안은 목록이 다 들어가게 늘린다. 아래 투명한 유리(lift)는 비워 둔다.
+    /// 지금 팝업 높이. 캘린더 계정을 고르는 동안은 목록이 다 들어가게 늘린다(아래 여백은 위와 같게).
     /// 다만 화면 높이의 절반, 그리고 노치 패널(620) 안에 그림자까지 들어가는 높이를 넘지 않는다. 넘치면 목록이 스크롤된다.
     @MainActor
     func popupHeight(calendar: CalendarFeed, metrics: NotchMetrics) -> CGFloat {
@@ -983,7 +983,7 @@ extension DropTuning {
         let top = metrics.height + growHeight + gap  // 화면 위 끝 ~ 팝업 위 끝
         let n = CGFloat(calendar.accounts.count)
         let list = 16 + AccountPicker.titleGap + n * AccountPicker.rowHeight + (n - 1) * AccountPicker.rowGap
-        let needed = textTop + list + lift
+        let needed = textTop + list + textTop
         let limit = min(metrics.screen.frame.height / 2, 620 - 40) - top
         return max(popupHeight, min(needed, limit))
     }
