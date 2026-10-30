@@ -57,18 +57,18 @@ struct AccountPicker: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
-    /// 목록 맨 끝: 평소엔 상자 없이 "Choose later" 글자만(검정, 계정 이름과 같은 크기 굵게).
-    /// 마우스를 올리면 계정 상자와 같은 모양의 상자가 보인다. 글자가 검정이라 상자는 흰색(0.8)으로. 누르면 고르지 않고 닫는다.
+    /// 목록 맨 끝: 평소엔 상자 없이 "Choose later" 글자만(검정, 계정 이름과 같은 크기, 세미볼드).
+    /// 마우스를 올리면 계정 상자와 같은 검정 0.8 상자가 보이고, 그 위에서 읽히게 글자는 흰색. 누르면 고르지 않고 닫는다.
     private var laterRow: some View {
         Button(action: onLater) {
             Text("Choose later")
-                .font(.system(size: textSize + 6, weight: .bold))
-                .foregroundStyle(.black)
+                .font(.system(size: textSize + 6, weight: .semibold))
+                .foregroundStyle(hovered == "later" ? .white : .black)
                 .padding(.horizontal, Self.innerH)
                 .padding(.vertical, Self.innerV)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .background(RoundedRectangle(cornerRadius: 24)
-                    .fill(Color.white.opacity(hovered == "later" ? 0.8 : 0)))
+                    .fill(Color.black.opacity(hovered == "later" ? 0.8 : 0)))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
