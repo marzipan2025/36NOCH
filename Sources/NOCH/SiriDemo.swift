@@ -11,7 +11,7 @@ import SwiftUI
 
 import Combine
 
-/// 모든 조절 값. 기본값은 2026-10-31 사용자가 맞춘 7차 설정.
+/// 모든 조절 값. 기본값은 2026-10-31 사용자가 맞춘 8차 설정.
 /// 바꾼 값은 UserDefaults에 저장해서 앱을 다시 켜도 이어진다.
 final class DropTuning: ObservableObject {
     // 노치 확장
@@ -24,7 +24,7 @@ final class DropTuning: ObservableObject {
     // 팝업 방울
     @Published var popupHeight: CGFloat = 240
     @Published var popupRadius: CGFloat = 26
-    @Published var gap: CGFloat = 12                 // 커진 노치 아래 끝과 팝업 위 끝 사이
+    @Published var gap: CGFloat = 14                 // 커진 노치 아래 끝과 팝업 위 끝 사이
     @Published var spacing: CGFloat = 12             // GlassEffectContainer가 두 유리를 붙이는 거리
     @Published var grainHeight: CGFloat = 34         // 떨어지기 전 팝업 높이(실제 노치 밑에 숨어 있음)
     @Published var waitInset: CGFloat = 4            // 대기 중 팝업을 실제 노치보다 좁힐 너비(양쪽 합). 하드웨어 노치에 완전히 가려지게
@@ -88,12 +88,11 @@ final class DropTuning: ObservableObject {
     /// 바뀔 때마다 패널이 열기/닫기 모션을 한다. 마우스 위치(SiriDemo)나 설정창 버튼이 바꾼다.
     @Published var isOpen = false
 
-    /// 7차 설정(= 기본값): 2026-10-31 집 맥에서 사용자가 맞춘 값. 6차에서 노치 높이 + 8→12, 노치와 간격 10→12,
-    /// 붙는 거리 14→12, 검정 반지름 60.5→60. 이어서 시계·글을 20 내리면서 팝업 높이 220→240, 커진 노치 너비 + 100→92. (6차: 5차에서 검정 위로 75→96, 흐림 27.5→28.5, 반지름 33→60.5.)
-    /// 조절하다가 이 값으로 되돌릴 때 쓴다.
-    func applySeventhPreset() {
+    /// 8차 설정(= 기본값): 2026-10-31 집 맥. 7차(노치 높이 + 12, 간격 12, 붙는 거리 12, 검정 반지름 60)에
+    /// 팝업 높이 220→240, 커진 노치 너비 + 100→92, 노치와 간격 12→14를 더한 값. 조절하다가 이 값으로 되돌릴 때 쓴다.
+    func applyEighthPreset() {
         growWidth = 92; growHeight = 12; restWide = true; restWidth = 44; grownBottomRadius = 26; grownTopRadius = 12; popupHeight = 240
-        popupRadius = 26; gap = 12; spacing = 12; grainHeight = 34; waitInset = 4
+        popupRadius = 26; gap = 14; spacing = 12; grainHeight = 34; waitInset = 4
         inkDelay = 0; inkDuration = 0.65; inkNeck = true; clearGlass = true; tintOpacity = 0
         lift = 96; softness = 28.5; blackRadius = 60; sideInset = -5.5; blackOpacity = 1; overBlack = 0.65
         trayHeight = 58.5; trayMargin = 24; trayOpacity = 0.1; trayConcentric = true
@@ -427,7 +426,7 @@ struct DropPanelView: View {
             Text(title)
                 .font(.system(size: titleSize, weight: .light))
                 .foregroundStyle(titleColor(color, hover: onTitle != nil && hoverTitle))
-                .offset(x: -1, y: 2)  // 좌우 여백 22에서 왼쪽으로 1, 아래로 2
+                .offset(x: 1, y: 2)  // 좌우 여백 22에서 오른쪽으로 1(예전 −1에서 2 옮김), 아래로 2
                 .onHover { hoverTitle = $0 }
                 .onTapGesture { onTitle?() }
         }
@@ -612,7 +611,7 @@ struct DropControlView: View {
                 Button("닫기") { tuning.isOpen = false }
                 Button("다시 재생") { replay() }
                 Spacer()
-                Button("7차설정") { tuning.applySeventhPreset(); replay() }
+                Button("8차설정") { tuning.applyEighthPreset(); replay() }
                 Button("종료") { NSApp.terminate(nil) }
             }
             .padding(16)
