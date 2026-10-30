@@ -18,7 +18,7 @@ final class DropTuning: ObservableObject {
     @Published var growWidth: CGFloat = 100
     @Published var growHeight: CGFloat = 8
     @Published var restWide = true                  // 닫혀 있을 때도 노치 검정을 좌우로 늘여 둔다
-    @Published var restWidth: CGFloat = 48           // 그때 늘이는 너비(양쪽 합, 한쪽 24)
+    @Published var restWidth: CGFloat = 44           // 그때 늘이는 너비(양쪽 합, 한쪽 22)
     @Published var grownBottomRadius: CGFloat = 26   // 커진 노치 아래 모서리(볼록). 원래 노치 10
     @Published var grownTopRadius: CGFloat = 12      // 커진 노치 위 모서리(오목). 원래 노치 6
     // 팝업 방울
@@ -88,7 +88,7 @@ final class DropTuning: ObservableObject {
     /// 4차 설정(= 기본값): 2026-10-30 회사 맥에서 사용자가 맞춘 값. 3차에서 간격 11→10, 유리 붙는 거리 16→14,
     /// 떨어지는 시간 0.75→0.55, 튕김 0.4→0.2. 조절하다가 이 값으로 되돌릴 때 쓴다.
     func applyFourthPreset() {
-        growWidth = 100; growHeight = 8; restWide = true; restWidth = 48; grownBottomRadius = 26; grownTopRadius = 12; popupHeight = 220
+        growWidth = 100; growHeight = 8; restWide = true; restWidth = 44; grownBottomRadius = 26; grownTopRadius = 12; popupHeight = 220
         popupRadius = 26; gap = 10; spacing = 14; grainHeight = 34; waitInset = 4
         inkDelay = 0; inkDuration = 0.65; inkNeck = true; clearGlass = true; tintOpacity = 0
         lift = 35.5; softness = 22.5; blackRadius = 60; sideInset = -10; blackOpacity = 1; overBlack = 0.5
