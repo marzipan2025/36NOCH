@@ -248,7 +248,7 @@ struct DropPanelView: View {
     }
 
     /// 노치 좌우의 14pt 아이콘 버튼 두 개(IconShape.left / right, 다운로드한 SVG). 닫혀 있을 때는 실제(하드웨어) 노치 좌우 끝에 바짝 붙어 #181818,
-    /// 열리면 #666666이 되고 노치가 넓어지는 만큼 바깥으로 함께 움직인다. 높이는 늘 노치 높이 가운데.
+    /// 열리면 #24252F가 되고 노치가 넓어지는 만큼 바깥으로 함께 움직인다. 높이는 늘 노치 높이 가운데.
     /// 오른쪽 원이 설정창을 연다. 왼쪽 원은 아직 하는 일이 없다.
     private var notchButtons: some View {
         let d: CGFloat = 14
@@ -257,7 +257,7 @@ struct DropPanelView: View {
         // 열렸을 때는 높이 가운데에서 안쪽으로 5, 위로 4 옮긴다
         let x = metrics.width / 2 + d / 2 + spread - (grown ? 5 : 0)
         let y = notchHeight / 2 - d / 2 - (grown ? 4 : 0)
-        let color = grown ? Color(red: 0x66 / 255, green: 0x66 / 255, blue: 0x66 / 255)
+        let color = grown ? Color(red: 0x24 / 255, green: 0x25 / 255, blue: 0x2F / 255)
                           : Color(red: 0x18 / 255, green: 0x18 / 255, blue: 0x18 / 255)
         return ZStack {
             IconShape.left.fill(color).frame(width: d, height: d)
