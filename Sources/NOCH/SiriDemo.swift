@@ -336,8 +336,9 @@ struct DropPanelView: View {
 
             // 유리 위에 얹는 것: 하단 영역, 테두리 빛, 글
             ZStack(alignment: .topLeading) {
+                // 계정을 고르는 동안은 하단 캡슐(흰 곳)을 없앤다. 버튼만 그 자리에.
                 tray(Color.white.opacity(tuning.trayOpacity))
-                    .opacity(trayShown ? 1 : 0)
+                    .opacity(trayShown && !calendar.picking ? 1 : 0)
                 if calendar.picking {
                     AccountTrayButtons(calendar: calendar, textSize: tuning.textSize)
                         .padding(.horizontal, trayRadius * 0.4)
@@ -461,7 +462,7 @@ struct DropPanelView: View {
             .frame(width: popupSize.width, height: popupSize.height, alignment: .topLeading)
             .mask {
                 Rectangle()
-                    .overlay { tray(Color.black).opacity(trayShown ? 1 : 0).blendMode(.destinationOut) }
+                    .overlay { tray(Color.black).opacity(trayShown && !calendar.picking ? 1 : 0).blendMode(.destinationOut) }
                     .compositingGroup()
             }
             .clipShape(popupShape)
@@ -482,7 +483,10 @@ struct DropPanelView: View {
     /// 흐린 경계가 모양의 아래 모서리 곡선을 따라가므로, 모서리 쪽에서는 검정이 위로 휘어 올라간다.
     private var blackCover: some View {
         let extraTop: CGFloat = 120
-        let height = max(0, popupSize.height - tuning.lift + extraTop)
+        // 계정을 고르는 동안은 아래 유리(뒤 화면이 비쳐 하얗게 보이는 곳)까지 검정으로 덮는다.
+        // 흐림이 아래 끝에서 옅어지지 않게 흐림 길이의 두 배만큼 아래로 더 내린다.
+        let lift = calendar.picking ? -tuning.softness * 2 : tuning.lift
+        let height = max(0, popupSize.height - lift + extraTop)
         return RoundedRectangle(cornerRadius: tuning.blackRadius)
             .fill(.black)
             .frame(width: max(0, popupSize.width - tuning.sideInset * 2), height: height)

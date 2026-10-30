@@ -8,7 +8,7 @@ struct AccountPicker: View {
     @State private var hovered: String?
 
     /// 계정 한 줄 높이(이름 + 캘린더 줄 + 위아래 여백 + 줄 사이). 화면에서 잰 값. 팝업 높이 계산에 쓴다.
-    static let rowHeight: CGFloat = 40
+    static let rowHeight: CGFloat = 45
 
     private static let light = Color(red: 0xcc / 255, green: 0xcc / 255, blue: 0xdd / 255)  // #ccccdd
     private static let dim = Color(red: 0x9a / 255, green: 0x9c / 255, blue: 0xb8 / 255)    // #9A9CB8. 아래쪽 유리 위에서도 읽히게
@@ -47,7 +47,7 @@ struct AccountPicker: View {
             VStack(alignment: .leading, spacing: 1) {
                 HStack(spacing: 5) {
                     Text(account.title)
-                        .font(.system(size: textSize + 2, weight: .medium))
+                        .font(.system(size: textSize + 6, weight: .medium))
                         .foregroundStyle(.white)
                     if current {
                         Circle().fill(Color(red: 1, green: 0xd7 / 255, blue: 0)).frame(width: 5, height: 5)
@@ -99,8 +99,8 @@ struct AccountTrayButtons: View {
                 .foregroundStyle(hovered == id ? .white : Color(red: 0xcc / 255, green: 0xcc / 255, blue: 0xdd / 255))
                 .padding(.horizontal, 10)
                 .padding(.vertical, 6)
-                // 하단 캡슐은 뒤 화면이 비쳐 밝을 수 있어서 버튼마다 어두운 캡슐을 깐다
-                .background(Capsule().fill(Color.black.opacity(hovered == id ? 0.8 : 0.55)))
+                // 고르는 동안은 팝업 아래까지 검정이라, 버튼은 옅은 흰 캡슐로 드러낸다
+                .background(Capsule().fill(Color.white.opacity(hovered == id ? 0.16 : 0.08)))
                 .contentShape(Capsule())
         }
         .buttonStyle(.plain)
