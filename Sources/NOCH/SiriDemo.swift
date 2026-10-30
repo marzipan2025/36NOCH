@@ -237,8 +237,7 @@ struct DropPanelView: View {
             // 커진 노치는 하드웨어 노치와 같은 검정
             notchShape.fill(.black)
 
-            restDots
-            settingsButton
+            notchButtons
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onChange(of: tuning.isOpen) { _, open in
@@ -247,36 +246,32 @@ struct DropPanelView: View {
         }
     }
 
-    /// 설정 아이콘. 노치가 커지며 생긴 오른쪽 검정 영역(하드웨어 노치 오른쪽 끝 ~ 커진 노치 오른쪽 끝)의 한가운데.
-    private var settingsButton: some View {
-        let x = metrics.width / 2 + tuning.growWidth / 4
-        let y = (metrics.height + tuning.growHeight) / 2
-        return Button(action: onSettings) {
-            Image(systemName: "gearshape.fill")
-                .resizable()
-                .frame(width: 12, height: 12)
-                .foregroundStyle(Color(red: 0x66 / 255, green: 0x66 / 255, blue: 0x66 / 255))
-                .frame(width: 24, height: 24)   // 누르기 쉽게 누르는 영역만 넓힘
-                .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .offset(x: x, y: y - 12)
-        .opacity(grown ? 1 : 0)
-        .allowsHitTesting(grown)
-    }
-
-    /// 닫혀 있을 때: 실제(하드웨어) 노치 좌우 끝에 바짝 붙인 6pt 회색 원 두 개, 높이 가운데.
-    /// 넓혀 둔 검정(restWidth) 위에 놓인다. 열리면 사라진다.
-    private var restDots: some View {
-        let d: CGFloat = 6
-        let x = metrics.width / 2 + d / 2
-        let dot = Circle().fill(Color(red: 0x66 / 255, green: 0x66 / 255, blue: 0x66 / 255)).frame(width: d, height: d)
+    /// 노치 좌우의 14pt 아이콘 버튼 두 개(IconShape.left / right, 다운로드한 SVG). 닫혀 있을 때는 실제(하드웨어) 노치 좌우 끝에 바짝 붙어 #181818,
+    /// 열리면 #666666이 되고 노치가 넓어지는 만큼 바깥으로 함께 움직인다. 높이는 늘 노치 높이 가운데.
+    /// 오른쪽 원이 설정창을 연다. 왼쪽 원은 아직 하는 일이 없다.
+    private var notchButtons: some View {
+        let d: CGFloat = 14
+        // 닫힌 노치 끝에서 열린 노치 끝까지 한쪽이 넓어지는 양
+        let spread = grown ? (tuning.growWidth - (tuning.restWide ? tuning.restWidth : 0)) / 2 : 0
+        // 열렸을 때는 높이 가운데에서 안쪽으로 5, 위로 4 옮긴다
+        let x = metrics.width / 2 + d / 2 + spread - (grown ? 5 : 0)
+        let y = notchHeight / 2 - d / 2 - (grown ? 4 : 0)
+        let color = grown ? Color(red: 0x66 / 255, green: 0x66 / 255, blue: 0x66 / 255)
+                          : Color(red: 0x18 / 255, green: 0x18 / 255, blue: 0x18 / 255)
         return ZStack {
-            dot.offset(x: -x)
-            dot.offset(x: x)
+            IconShape.left.fill(color).frame(width: d, height: d)
+                .offset(x: -x)
+            Button(action: onSettings) {
+                IconShape.right.fill(color).frame(width: d, height: d)
+                    .frame(width: 24, height: 24)   // 누르기 쉽게 누르는 영역만 넓힘
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .offset(x: x)
+            .allowsHitTesting(grown)
         }
-        .offset(y: metrics.height / 2 - d / 2)
-        .opacity(grown ? 0 : 1)
+        .frame(height: 24)
+        .offset(y: y - (24 - d) / 2)
     }
 
     /// 팝업과 그 유리 컨테이너. 검정 덮개 → 유리 → 글 순으로 쌓는다.
