@@ -336,17 +336,9 @@ struct DropPanelView: View {
 
             // 유리 위에 얹는 것: 하단 영역, 테두리 빛, 글
             ZStack(alignment: .topLeading) {
-                // 계정을 고르는 동안은 하단 캡슐(흰 곳)을 없앤다. 버튼만 그 자리에.
+                // 계정을 고르는 동안은 하단 캡슐(흰 곳)을 없앤다.
                 tray(Color.white.opacity(tuning.trayOpacity))
                     .opacity(trayShown && !calendar.picking ? 1 : 0)
-                if calendar.picking {
-                    AccountTrayButtons(calendar: calendar, textSize: tuning.textSize)
-                        .padding(.horizontal, trayRadius * 0.4)
-                        .frame(width: max(0, popupSize.width - tuning.trayMargin * 2), height: tuning.trayHeight)
-                        .padding(.bottom, tuning.trayMargin)
-                        .frame(width: popupSize.width, height: popupSize.height, alignment: .bottom)
-                        .opacity(trayShown ? 1 : 0)
-                }
                 rim
                 // 왼쪽: 남은 시간(금색) 아래에 회의 제목(어두운 금색). 오른쪽: 날짜·시각 두 줄.
                 // 0.5초마다 다시 그린다(남은 시간, 퇴근 알림, 00:00 깜빡임, 콜론 깜빡임).
@@ -354,7 +346,8 @@ struct DropPanelView: View {
                 // 계정을 고르는 중이면 시계 자리에 계정 목록(AccountPicker)
                 Group { if calendar.picking {
                     AccountPicker(calendar: calendar, textSize: tuning.textSize)
-                        .frame(height: max(0, popupSize.height - tuning.textTop - tuning.trayHeight - tuning.trayMargin - 8))
+                        // 아래 투명한 유리(검정 덮개가 끝나는 lift 아래)에는 목록이 내려가지 않게
+                        .frame(height: max(0, popupSize.height - tuning.textTop - tuning.lift))
                 } else {
                 TimelineView(.periodic(from: Date(timeIntervalSinceReferenceDate: Date().timeIntervalSinceReferenceDate.rounded(.down)), by: 0.5)) { context in
                     let now = context.date
@@ -483,10 +476,7 @@ struct DropPanelView: View {
     /// 흐린 경계가 모양의 아래 모서리 곡선을 따라가므로, 모서리 쪽에서는 검정이 위로 휘어 올라간다.
     private var blackCover: some View {
         let extraTop: CGFloat = 120
-        // 계정을 고르는 동안은 아래 유리(뒤 화면이 비쳐 하얗게 보이는 곳)까지 검정으로 덮는다.
-        // 흐림이 아래 끝에서 옅어지지 않게 흐림 길이의 두 배만큼 아래로 더 내린다.
-        let lift = calendar.picking ? -tuning.softness * 2 : tuning.lift
-        let height = max(0, popupSize.height - lift + extraTop)
+        let height = max(0, popupSize.height - tuning.lift + extraTop)
         return RoundedRectangle(cornerRadius: tuning.blackRadius)
             .fill(.black)
             .frame(width: max(0, popupSize.width - tuning.sideInset * 2), height: height)
@@ -899,8 +889,9 @@ final class SiriDemo: NSObject {
         // 설정창이 떠 있으면 펼친 채 유지. 설정창을 닫으면 다음 확인(1/60초 뒤)에 바로 아래 규칙으로 돌아가서,
         // 마우스가 노치+팝업 위에 없으면 곧장 닫힌다.
         // 회의 알림도 마찬가지로 마우스와 상관없이 펼친 채 유지한다.
-        // 팝업에서 캘린더 계정을 고르는 동안도 열어 둔다.
-        let alerting = meetingAlert() || GoHome.isTime(Date(), seconds: GoHome.seconds) || calendar.picking
+        // 팝업에서 캘린더 계정을 고르는 동안도 열어 둔다(고를 계정이 있을 때만. 권한 거부·계정 없음은 안내 글만이라 붙들지 않는다).
+        let choosing = calendar.picking && calendar.status != .denied && !calendar.accounts.isEmpty
+        let alerting = meetingAlert() || GoHome.isTime(Date(), seconds: GoHome.seconds) || choosing
         if alerting && !t.isOpen { t.isOpen = true }
         let holding = alerting || (t.holdWhileSettings && (controlWindow?.isVisible ?? false))
         if !holding {
@@ -984,14 +975,15 @@ extension SiriDemo: NSMenuDelegate {
 }
 
 extension DropTuning {
-    /// 지금 팝업 높이. 캘린더 계정을 고르는 동안은 목록이 다 들어가게 늘린다(계정 한 줄 약 40pt).
+    /// 지금 팝업 높이. 캘린더 계정을 고르는 동안은 목록이 다 들어가게 늘린다. 아래 투명한 유리(lift)는 비워 둔다.
     /// 다만 화면 높이의 절반, 그리고 노치 패널(620) 안에 그림자까지 들어가는 높이를 넘지 않는다. 넘치면 목록이 스크롤된다.
     @MainActor
     func popupHeight(calendar: CalendarFeed, metrics: NotchMetrics) -> CGFloat {
         guard calendar.picking, calendar.status != .denied, !calendar.accounts.isEmpty else { return popupHeight }
         let top = metrics.height + growHeight + gap  // 화면 위 끝 ~ 팝업 위 끝
-        let list = 16 + 6 + CGFloat(calendar.accounts.count) * AccountPicker.rowHeight + 8
-        let needed = textTop + list + trayHeight + trayMargin
+        let n = CGFloat(calendar.accounts.count)
+        let list = 16 + AccountPicker.titleGap + n * AccountPicker.rowHeight + (n - 1) * AccountPicker.rowGap
+        let needed = textTop + list + lift
         let limit = min(metrics.screen.frame.height / 2, 620 - 40) - top
         return max(popupHeight, min(needed, limit))
     }

@@ -38,8 +38,6 @@ final class CalendarFeed: ObservableObject {
     /// 팝업에서 계정을 고르는 중인지. 고르는 동안은 마우스와 상관없이 팝업을 열어 둔다.
     @Published private(set) var picking = false
     @Published private(set) var accounts: [Account] = []
-    /// "Later"를 누르면 이번 실행 동안은 계정 고르기를 저절로 띄우지 않는다
-    private var pickingDismissed = false
 
     /// 고른 계정(EKSource.sourceIdentifier)을 저장하는 키
     private static let sourceKey = "calendarSourceID"
@@ -152,16 +150,15 @@ final class CalendarFeed: ObservableObject {
         .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
     }
 
-    /// 저절로 띄우는 경우(첫 실행, 고른 계정이 없어짐, 권한 거부). "Later"를 눌렀으면 이번 실행에서는 다시 안 띄운다.
+    /// 저절로 띄우는 경우(첫 실행, 고른 계정이 없어짐, 권한 거부)
     private func offerPicking() {
-        guard !pickingDismissed else { return }
+        guard !picking else { return }
         startPicking()
     }
 
     /// 메뉴의 "캘린더 계정…", 또는 팝업의 안내 글을 눌렀을 때
     func startPicking() {
         if status != .denied { loadAccounts() }
-        pickingDismissed = false
         picking = true
     }
 
@@ -172,12 +169,7 @@ final class CalendarFeed: ObservableObject {
         reload()
     }
 
-    func later() {
-        picking = false
-        pickingDismissed = true
-    }
-
-    /// 목록에 없는 계정은 시스템 설정 > 인터넷 계정에서 로그인해 넣는다(맥 기본 기능, 무료).
+    /// 목록에 없는 계정은 시스템 설정 > 인터넷 계정에서 로그인해 넣는다(맥 기본 기능, 무료). 지금은 계정이 하나도 없을 때의 안내 글에서만 연다.
     /// 넣고 나면 EKEventStoreChanged로 목록이 저절로 바뀐다.
     func openInternetAccounts() {
         NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Internet-Accounts-Settings.extension")!)
