@@ -2,7 +2,7 @@
 # 릴리스 빌드 → build/36NOCH.app 으로 포장
 set -e
 cd "$(dirname "$0")"
-VERSION="0.0.1"
+VERSION="0.0.2"
 APP="build/36NOCH.app"
 
 swift build -c release
