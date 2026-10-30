@@ -6,7 +6,7 @@
 |---|---|
 | 앱 이름 / 실행 파일 | `36NOCH` / `NOCH` |
 | 번들 ID | `com.artbrain.noch` |
-| 최소 macOS | 14.0 (집 맥 26.6.2, 회사 맥은 확인 필요) |
+| 최소 macOS | 14.0 (집 맥 26.6.2, 회사 맥 27.0.1) |
 | 구조 | SwiftPM 실행 타깃 + `build-app.sh`로 .app 포장 (33RUVI와 같은 방식) |
 | UI | SwiftUI + AppKit(`NSPanel`) |
 | 서명 | ad-hoc |
@@ -46,4 +46,4 @@
 
 - NotchNook과 같이 켤지: 같이 켜면 마우스를 올렸을 때 두 앱이 동시에 열림. 36NOCH를 작게 뜸 전용으로 두거나, 하나를 끄거나
 - 저장소 공개 여부(지금은 private)
-- 회사 맥에 노치가 있는지, macOS 버전
+- ~~회사 맥에 노치가 있는지, macOS 버전~~ → 노치 있음, macOS 27.0.1 (RESEARCH §1.3)
