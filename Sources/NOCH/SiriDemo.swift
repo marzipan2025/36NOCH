@@ -250,6 +250,9 @@ struct DropPanelView: View {
     /// 노치 좌우의 14pt 아이콘 버튼 두 개(IconShape.left / right, 다운로드한 SVG). 닫혀 있을 때는 실제(하드웨어) 노치 좌우 끝에 바짝 붙어 #181818,
     /// 열리면 #24252F가 되고 노치가 넓어지는 만큼 바깥으로 함께 움직인다. 높이는 늘 노치 높이 가운데.
     /// 오른쪽 원이 설정창을 연다. 왼쪽 원은 아직 하는 일이 없다.
+    @State private var hoverLeft = false
+    @State private var hoverRight = false
+
     private var notchButtons: some View {
         let d: CGFloat = 14
         // 닫힌 노치 끝에서 열린 노치 끝까지 한쪽이 넓어지는 양
@@ -259,14 +262,21 @@ struct DropPanelView: View {
         let y = notchHeight / 2 - d / 2 - (grown ? 4 : 0)
         let color = grown ? Color(red: 0x24 / 255, green: 0x25 / 255, blue: 0x2F / 255)
                           : Color(red: 0x18 / 255, green: 0x18 / 255, blue: 0x18 / 255)
+        // 열려 있을 때 마우스를 올리면 #303243
+        let hover = Color(red: 0x30 / 255, green: 0x32 / 255, blue: 0x43 / 255)
         return ZStack {
-            IconShape.left.fill(color).frame(width: d, height: d)
+            IconShape.left.fill(grown && hoverLeft ? hover : color).frame(width: d, height: d)
+                .frame(width: 24, height: 24)
+                .contentShape(Rectangle())
+                .onHover { hoverLeft = $0 }
                 .offset(x: -x)
+                .allowsHitTesting(grown)
             Button(action: onSettings) {
-                IconShape.right.fill(color).frame(width: d, height: d)
+                IconShape.right.fill(grown && hoverRight ? hover : color).frame(width: d, height: d)
                     .frame(width: 24, height: 24)   // 누르기 쉽게 누르는 영역만 넓힘
                     .contentShape(Rectangle())
             }
+            .onHover { hoverRight = $0 }
             .buttonStyle(.plain)
             .focusable(false)   // 키 창이 되면 첫 버튼에 파란 포커스 테두리가 잡히므로 끈다
             .focusEffectDisabled()
@@ -332,7 +342,8 @@ struct DropPanelView: View {
                             clockColumn(text: countdownText(to: next.start, now: now), title: calendar.summary,
                                         color: alert ? (1, 0x3b / 255, 0x30 / 255)  // #ff3b30
                                                      : (1, 0xd7 / 255, 0),  // Gold #ffd700
-                                        clockVisible: !blinking || Int(now.timeIntervalSinceReferenceDate * 2) % 2 == 0)
+                                        clockVisible: !blinking || Int(now.timeIntervalSinceReferenceDate * 2) % 2 == 0,
+                                        onTitle: openCalendarApp)
                         } else {
                             Text(calendar.summary)
                                 .foregroundStyle(Color(red: 0xcc / 255, green: 0xcc / 255, blue: 0xdd / 255))
@@ -360,7 +371,7 @@ struct DropPanelView: View {
     /// 왼쪽 시계와 그 아래 제목. 너비를 고정한 시계는 글자 수가 줄면 커져 아래로 늘어나고 제목은 그만큼 밀린다.
     /// 제목은 늘 시계 색을 70%로 어둡게 한 색.
     private func clockColumn(text: String, title: String, color: (r: Double, g: Double, b: Double),
-                             clockVisible: Bool = true) -> some View {
+                             clockVisible: Bool = true, onTitle: (() -> Void)? = nil) -> some View {
         let size = ClockFont.size(for: text, width: tuning.countdownWidth)
         let small = NSFont.systemFont(ofSize: tuning.textSize, weight: .light)
         let smallCapTop = small.ascender - small.capHeight  // 작은 글 프레임 위 ~ 글자 위 끝
@@ -371,10 +382,16 @@ struct DropPanelView: View {
                 .opacity(clockVisible ? 1 : 0)
             Text(title)
                 .foregroundStyle(Color(red: color.r * 0.7, green: color.g * 0.7, blue: color.b * 0.7))
-                .offset(x: -1)  // 좌우 여백 22에서 왼쪽으로 1
+                .offset(x: -1, y: 2)  // 좌우 여백 22에서 왼쪽으로 1, 아래로 2
+                .onTapGesture { onTitle?() }
         }
         // 숫자 위 끝이 오른쪽 날짜 글자 위 끝과 같은 높이에 오도록 끌어올린다
         .padding(.top, smallCapTop - size * ClockFont.capTop - tuning.countdownLift)
+    }
+
+    /// 회의 제목을 누르면 캘린더 앱을 띄운다
+    private func openCalendarApp() {
+        NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Calendar.app"))
     }
 
     /// 팝업 자리에 놓인 검정 덮개. 하단 영역 모양만큼은 오려 내서 그 안에 검정이 들어오지 않게 한다.
