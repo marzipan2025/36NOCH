@@ -41,5 +41,9 @@ cat > "$APP/Contents/Info.plist" <<PLIST
 </dict>
 </plist>
 PLIST
-codesign --force --sign - "$APP"
+# 서명: Apple Development 인증서가 있으면 그것으로. ad-hoc 서명은 빌드마다 달라져서 업데이트할 때마다
+# 캘린더 권한을 다시 묻는다. 인증서가 같으면 권한이 이어진다. 없으면 ad-hoc.
+IDENTITY="$(security find-identity -v -p codesigning | awk -F'"' '/Apple Development/ {print $2; exit}')"
+codesign --force --sign "${IDENTITY:--}" "$APP"
+echo "서명: ${IDENTITY:-ad-hoc}"
 echo "완료: $APP"

@@ -172,6 +172,7 @@ struct DropPanelView: View {
     let onSettings: () -> Void
     @ObservedObject var tuning: DropTuning
     @ObservedObject var calendar: CalendarFeed
+    @ObservedObject var updates: UpdateFeed
 
     // 모션 단계: 노치가 커졌는지, 방울이 떨어졌는지
     @State private var grown = false
@@ -249,7 +250,7 @@ struct DropPanelView: View {
 
     /// 노치 좌우의 14pt 아이콘 버튼 두 개(IconShape.left / right, 다운로드한 SVG). 닫혀 있을 때는 실제(하드웨어) 노치 좌우 끝에 바짝 붙어 #181818,
     /// 열리면 #24252F가 되고 노치가 넓어지는 만큼 바깥으로 함께 움직인다. 높이는 늘 노치 높이 가운데.
-    /// 오른쪽 원이 설정창을 연다. 왼쪽 원은 아직 하는 일이 없다.
+    /// 오른쪽 원이 설정창을 연다. 왼쪽 원은 새 버전이 있을 때만 금색(#ffd700)이 되고, 누르면 업데이트한다.
     @State private var hoverLeft = false
     @State private var hoverRight = false
     @State private var hoverTitle = false
@@ -265,13 +266,23 @@ struct DropPanelView: View {
                           : Color(red: 0x18 / 255, green: 0x18 / 255, blue: 0x18 / 255)
         // 열려 있을 때 마우스를 올리면 #303243
         let hover = Color(red: 0x30 / 255, green: 0x32 / 255, blue: 0x43 / 255)
+        let update = updates.available != nil
+        let gold = Color(red: 1, green: 0xd7 / 255, blue: 0)
+        let leftColor = update ? (grown && hoverLeft ? gold.mix(with: .white, by: 0.3) : gold)
+                               : (grown && hoverLeft ? hover : color)
         return ZStack {
-            IconShape.left.fill(grown && hoverLeft ? hover : color).frame(width: d, height: d)
-                .frame(width: 24, height: 24)
-                .contentShape(Rectangle())
-                .onHover { hoverLeft = $0 }
-                .offset(x: -x)
-                .allowsHitTesting(grown)
+            Button(action: { updates.install() }) {
+                IconShape.left.fill(leftColor).frame(width: d, height: d)
+                    .frame(width: 24, height: 24)
+                    .contentShape(Rectangle())
+            }
+            .onHover { hoverLeft = $0 }
+            .buttonStyle(.plain)
+            .focusable(false)
+            .focusEffectDisabled()
+            .help(updates.available.map { "\($0.version)(으)로 업데이트" } ?? "")
+            .offset(x: -x)
+            .allowsHitTesting(grown)   // 새 버전이 없을 때 눌러도 install()이 아무것도 안 한다(롤오버 색만)
             Button(action: onSettings) {
                 IconShape.right.fill(grown && hoverRight ? hover : color).frame(width: d, height: d)
                     .frame(width: 24, height: 24)   // 누르기 쉽게 누르는 영역만 넓힘
@@ -729,6 +740,8 @@ final class SiriDemo: NSObject {
     private var mouseTimer: Timer?
     private let tuning = DropTuning()
     private let calendar = CalendarFeed()
+    private let updates = UpdateFeed()
+    private var updateItem: NSMenuItem?
 
     func start(metrics: NotchMetrics) {
         self.metrics = metrics
@@ -737,7 +750,7 @@ final class SiriDemo: NSObject {
         let panel = NotchPanel(frame: NotchPanel.topCenterFrame(on: metrics.screen, size: size))
         // 앱이 비활성이어도 활성 모양(유리)으로 그린다. 실제로 효과가 있는 건 NotchPanel의 비공개 메서드 덮어쓰기.
         let root = DropPanelView(metrics: metrics, onSettings: { [weak self] in self?.toggleSettings() },
-                                tuning: tuning, calendar: calendar)
+                                tuning: tuning, calendar: calendar, updates: updates)
             .environment(\.appearsActive, true)
             .environment(\.controlActiveState, .key)
         panel.contentView = FirstClickHostingView(rootView: root)
@@ -747,6 +760,7 @@ final class SiriDemo: NSObject {
         panel.makeKey()
         self.panel = panel
         calendar.start()
+        updates.start()
 
         // 설정창은 처음엔 숨겨 두고, 노치의 설정 아이콘으로 연다. 패널을 가리지 않게 오른쪽 아래에 둔다.
         let control = makeControlWindow(title: "36NOCH 방울 팝업 조절", on: metrics.screen, below: 600,
@@ -776,6 +790,15 @@ final class SiriDemo: NSObject {
             item.button?.title = "36"
         }
         let menu = NSMenu()
+        menu.delegate = self
+        let version = NSMenuItem(title: "36NOCH \(UpdateFeed.currentVersion)", action: nil, keyEquivalent: "")
+        version.isEnabled = false
+        menu.addItem(version)
+        let update = NSMenuItem(title: "업데이트 확인…", action: #selector(menuUpdate), keyEquivalent: "")
+        update.target = self
+        menu.addItem(update)
+        updateItem = update
+        menu.addItem(.separator())
         let settings = NSMenuItem(title: "설정…", action: #selector(menuSettings), keyEquivalent: ",")
         settings.target = self
         menu.addItem(settings)
@@ -787,6 +810,21 @@ final class SiriDemo: NSObject {
     }
 
     @objc private func menuSettings() { toggleSettings() }
+
+    /// 새 버전이 있으면 바로 업데이트, 없으면 확인하고 결과를 알린다
+    @objc private func menuUpdate() {
+        if updates.available != nil { updates.install(); return }
+        Task {
+            let found = await updates.check()
+            if found == true { updates.install(); return }
+            let alert = NSAlert()
+            alert.messageText = found == false ? "최신 버전입니다" : "확인하지 못했습니다"
+            alert.informativeText = found == false ? "36NOCH \(UpdateFeed.currentVersion)"
+                                                   : "인터넷 연결을 확인한 뒤 다시 시도하세요."
+            NSApp.activate()
+            alert.runModal()
+        }
+    }
 
     /// .app 번들 안(Contents/Resources)에서 찾고, `swift build`로 띄운 경우엔 저장소의 Resources에서 찾는다.
     private static func menuBarIcon() -> NSImage? {
@@ -885,4 +923,18 @@ final class SiriDemo: NSObject {
 /// 비활성 패널에서도 첫 클릭이 바로 버튼에 가게 한다.
 final class FirstClickHostingView<Content: View>: NSHostingView<Content> {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+}
+
+@available(macOS 26.0, *)
+extension SiriDemo: NSMenuDelegate {
+    /// 메뉴를 열 때 업데이트 항목 글을 지금 상태로
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        switch updates.state {
+        case .installing: updateItem?.title = "업데이트 중…"
+        case .checking: updateItem?.title = "확인 중…"
+        default:
+            updateItem?.title = updates.available.map { "\($0.version)(으)로 업데이트" } ?? "업데이트 확인…"
+        }
+        updateItem?.isEnabled = updates.state != .installing && updates.state != .checking
+    }
 }

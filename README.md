@@ -30,5 +30,17 @@ NotchNook(lo.cafe) 같은 완성품이 이미 있으므로, **NotchNook이 못 �
 2. `./build-app.sh` → `build/36NOCH.app`
 3. `ditto -c -k --keepParent build/36NOCH.app build/36NOCH-<버전>.zip`
 4. 커밋·푸시 후 `gh release create v<버전> build/36NOCH-<버전>.zip`
-5. 다른 맥: 릴리스에서 zip을 받아 풀고 `/Applications`에 복사. ad-hoc 서명이라 처음 열 때 Gatekeeper 경고가 뜨면 우클릭 → 열기. 캘린더 권한은 맥마다 한 번 허용.
+5. 다른 맥: 앱이 스스로 업데이트한다(아래). 처음 설치할 때만 릴리스에서 zip을 받아 풀고 `/Applications`에 복사. 처음 열 때 Gatekeeper 경고가 뜨면 우클릭 → 열기. 캘린더 권한은 맥마다 한 번 허용.
+
+zip은 릴리스에 하나만 올린다(앱이 `.zip`으로 끝나는 첫 첨부를 받는다). 태그는 `v<버전>`.
+
+## 인앱 업데이트
+
+`Sources/NOCH/Updater.swift`. 02rapi의 AppUpdater 방식(dmg 대신 zip).
+
+- 실행 10초 뒤, 그 뒤 6시간마다 공개 GitHub API(`releases/latest`)를 읽어 지금 버전과 비교한다. 메뉴 막대 메뉴의 "업데이트 확인…"으로도.
+- 새 버전이 있으면 메뉴 항목이 "<버전>(으)로 업데이트"가 되고, 노치를 열면 왼쪽 아이콘이 금색(#ffd700). 둘 중 하나를 누르면 zip을 받아 풀고 → 실행 중인 번들 옆에 스테이징 → 번들 ID 확인 → 번들을 바꾸고 → 종료 뒤 새 앱을 띄운다.
+- 실행 중인 번들 자리(`Bundle.main.bundleURL`)를 바꾸므로, `build/`의 시험 빌드를 띄운 채 업데이트하면 `/Applications`가 아니라 그 사본이 바뀐다. `swift build` 실행 파일은 확인하지 않는다.
+- 서명: `build-app.sh`는 Apple Development 인증서가 있으면 그것으로, 없으면 ad-hoc으로 서명한다. ad-hoc은 빌드마다 서명이 달라져서 업데이트할 때마다 캘린더 권한을 다시 묻는다. 집 맥은 `Apple Development: emile.byeongsu@gmail.com (Q875UL5S23)`. 서명한 인증서가 바뀌면(다른 맥 인증서, ad-hoc) 그 업데이트 뒤 한 번 다시 묻는다.
+- 시험: 앱 사본을 만들어 `NOCH_UPDATE_CURRENT_VERSION=0.0.1 <사본>/36NOCH.app/Contents/MacOS/NOCH --test-update` → 바로 확인하고 묻지 않고 설치·재실행. 2026-10-31 집 맥에서 0.0.1 → v0.0.2 성공.
 

@@ -11,7 +11,7 @@
 | 형태 | 메뉴 막대 앱(독 아이콘 없음, `LSUIElement`) |
 | UI | SwiftUI + AppKit(`NSPanel`) |
 | 서명 | ad-hoc |
-| 배포 | `gh release`로 두 맥에 설치. 인앱 업데이트는 나중에 |
+| 배포 | `gh release`(공개 저장소)의 zip. 0.0.3부터 인앱 업데이트(`Updater.swift`, 02rapi 방식) |
 
 ---
 
@@ -47,6 +47,6 @@
 ## 5. 정할 것
 
 - NotchNook과 같이 켤지: 같이 켜면 마우스를 올렸을 때 두 앱이 동시에 열림. 36NOCH를 작게 뜸 전용으로 두거나, 하나를 끄거나
-- 저장소 공개 여부(지금은 private)
+- ~~저장소 공개 여부~~ → 2026-10-31 공개로 바꿈(인앱 업데이트가 로그인 없이 릴리스를 읽게)
 - 최소 macOS를 26으로 올릴지: Liquid Glass(`glassEffect`)는 macOS 26+. 지금은 유리 실험만 `@available(macOS 26)`로 막아 둠. 두 맥 모두 26 이상
 - ~~회사 맥에 노치가 있는지, macOS 버전~~ → 노치 있음, macOS 27.0.1 (RESEARCH §1.3)
