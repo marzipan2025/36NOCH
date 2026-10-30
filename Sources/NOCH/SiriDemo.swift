@@ -366,6 +366,7 @@ struct DropPanelView: View {
                 .opacity(clockVisible ? 1 : 0)
             Text(title)
                 .foregroundStyle(Color(red: color.r * 0.7, green: color.g * 0.7, blue: color.b * 0.7))
+                .offset(x: -1)  // 좌우 여백 22에서 왼쪽으로 1
         }
         // 숫자 위 끝이 오른쪽 날짜 글자 위 끝과 같은 높이에 오도록 끌어올린다
         .padding(.top, smallCapTop - size * ClockFont.capTop - tuning.countdownLift)
