@@ -42,7 +42,7 @@ final class DropTuning: ObservableObject {
     @Published var blackOpacity: CGFloat = 1
     @Published var overBlack: CGFloat = 0.5          // 같은 검정 모양을 유리 "위"에도 이만큼 덧칠. 유리가 검정을 밝혀 보이게 하는 만큼 다시 어둡게
     // 하단 영역: 팝업 아래쪽 안에 둔 흰 반투명 면. 이 안에는 검정이 들어오지 않는다.
-    @Published var trayHeight: CGFloat = 60
+    @Published var trayHeight: CGFloat = 56
     @Published var trayMargin: CGFloat = 20          // 좌우·아래 여백
     @Published var trayOpacity: CGFloat = 0.1        // 흰색 불투명도
     @Published var trayConcentric = true             // 켜면 모서리 = 팝업 모서리 − 여백(같은 중심의 곡선), 끄면 팝업과 같은 반지름
@@ -92,7 +92,7 @@ final class DropTuning: ObservableObject {
         popupRadius = 26; gap = 10; spacing = 14; grainHeight = 34; waitInset = 4
         inkDelay = 0; inkDuration = 0.65; inkNeck = true; clearGlass = true; tintOpacity = 0
         lift = 35.5; softness = 22.5; blackRadius = 60; sideInset = -10; blackOpacity = 1; overBlack = 0.5
-        trayHeight = 60; trayMargin = 20; trayOpacity = 0.1; trayConcentric = true
+        trayHeight = 56; trayMargin = 20; trayOpacity = 0.1; trayConcentric = true
         trayRadiusPlus = 4; trayDelay = -0.2; trayFade = 0.3; trayCapsule = true; popupBottomConcentric = true
         rimOpacity = 0.05; rimWidth = 1; rimSoftness = 1.5; shadowOpacity = 0.3; shadowRadius = 28
         shadowY = 14.5; growDuration = 0.6
