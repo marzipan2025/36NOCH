@@ -193,9 +193,15 @@ enum ClockFont {
     private static func width(_ s: String) -> CGFloat {
         (s as NSString).size(withAttributes: [.font: unit]).width
     }
-    /// 네 글꼴 숫자 중 가장 넓은 폭. 어느 글꼴이 걸려도 칸 너비가 같다.
+    /// 글꼴마다 숫자 높이가 달라서(같은 크기에서 Light 69, Mix 72, Bold 77, Heavy 72) 대문자 높이를
+    /// DistroMix에 맞추는 배율. 이대로 크기를 곱해야 숫자 위 끝이 흔들리지 않는다.
+    static func scale(_ f: String) -> CGFloat {
+        guard let font = NSFont(name: f, size: 1), font.capHeight > 0 else { return 1 }
+        return unit.capHeight / font.capHeight
+    }
+    /// 네 글꼴 숫자(배율 적용) 중 가장 넓은 폭. 어느 글꼴이 걸려도 칸 너비가 같다.
     private static let digitCell: CGFloat = (digitNames.isEmpty ? [name] : digitNames).flatMap { f -> [CGFloat] in
-        let font = NSFont(name: f, size: 1) ?? unit
+        let font = NSFont(name: f, size: scale(f)) ?? unit
         return "0123456789".map { (String($0) as NSString).size(withAttributes: [.font: font]).width }
     }.max() ?? 0.6
 
@@ -247,7 +253,8 @@ struct ClockText: View {
         HStack(alignment: .lastTextBaseline, spacing: 0) {
             ForEach(Array(text.enumerated()), id: \.offset) { i, c in
                 Text(String(c))
-                    .font(.custom(i < fonts.count ? fonts[i] : ClockFont.name, size: size))
+                    .font(i < fonts.count ? .custom(fonts[i], size: size * ClockFont.scale(fonts[i]))
+                                          : .custom(ClockFont.name, size: size))
                     .frame(width: ClockFont.cell(c) * size)
                     .opacity(c == ":" && !colonOn ? 0 : 1)
             }
