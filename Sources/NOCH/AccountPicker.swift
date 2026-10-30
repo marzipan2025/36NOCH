@@ -30,6 +30,7 @@ struct AccountPicker: View {
             Text(calendar.status == .denied ? "Calendar access" : "Choose calendar account")
                 .font(.system(size: textSize, weight: .light))
                 .foregroundStyle(Self.light)
+                .padding(.leading, Self.innerH)  // 계정 상자 안 글자와 왼쪽을 맞춘다
             if calendar.status == .denied {
                 // 누르면 시스템 설정 > 개인정보 보호 및 보안 > 캘린더
                 message("36NOCH needs access to your calendars. Click to open System Settings.") {
@@ -56,16 +57,18 @@ struct AccountPicker: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
-    /// 목록 맨 끝: 상자 없이 "Choose later" 글자만(검정, 계정 이름과 같은 크기 굵게). 아래 투명한 유리 위라 검정으로 쓴다.
-    /// 마우스를 올리면 살짝 옅어지고, 누르면 고르지 않고 닫는다.
+    /// 목록 맨 끝: 평소엔 상자 없이 "Choose later" 글자만(검정, 계정 이름과 같은 크기 굵게).
+    /// 마우스를 올리면 계정 상자와 같은 모양의 상자가 보인다. 글자가 검정이라 상자는 흰색(0.8)으로. 누르면 고르지 않고 닫는다.
     private var laterRow: some View {
         Button(action: onLater) {
             Text("Choose later")
                 .font(.system(size: textSize + 6, weight: .bold))
-                .foregroundStyle(Color.black.opacity(hovered == "later" ? 0.6 : 1))
+                .foregroundStyle(.black)
                 .padding(.horizontal, Self.innerH)
                 .padding(.vertical, Self.innerV)
                 .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 24)
+                    .fill(Color.white.opacity(hovered == "later" ? 0.8 : 0)))
                 .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
