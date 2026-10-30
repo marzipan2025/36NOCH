@@ -15,7 +15,7 @@ import Combine
 /// 바꾼 값은 UserDefaults에 저장해서 앱을 다시 켜도 이어진다.
 final class DropTuning: ObservableObject {
     // 노치 확장
-    @Published var growWidth: CGFloat = 92
+    @Published var growWidth: CGFloat = 80
     @Published var growHeight: CGFloat = 12
     @Published var restWide = true                  // 닫혀 있을 때도 노치 검정을 좌우로 늘여 둔다
     @Published var restWidth: CGFloat = 44           // 그때 늘이는 너비(양쪽 합, 한쪽 22)
@@ -64,8 +64,9 @@ final class DropTuning: ObservableObject {
     let textPadding: CGFloat = 22
     let textTop: CGFloat = 30                // 팝업 위 끝 ~ 시계·글 위 끝(2026-10-31 18 → 38(팝업 높이도 20 늘림) → 30)
     let popupSideExtra: CGFloat = 12         // 시계·글·하단 영역은 그대로 두고 팝업만 좌우로 더 넓힌 양(한쪽). 그만큼 안쪽 여백이 는다
-    // 팝업이 커진 노치보다 넓은 양(양쪽 합). 커진 노치를 8 줄일 때(너비 + 100 → 92) 팝업 너비는 그대로 두려고 24에 8을 더함
-    var popupExtraWidth: CGFloat { 32 + popupSideExtra * 2 }
+    // 팝업이 커진 노치보다 넓은 양(양쪽 합). 커진 노치를 줄일 때(너비 + 100 → 92 → 80) 팝업 너비는 그대로 두려고
+    // 줄인 만큼(8, 12) 24에 더함
+    var popupExtraWidth: CGFloat { 44 + popupSideExtra * 2 }
     // 다음 회의까지 남은 시간(Distro Mix, 금색). 너비를 고정하고, 글자 수가 줄면 그만큼 글자가 커져 아래로 늘어난다.
     let countdownWidth: CGFloat = 204     // 시계 너비. 204면 8자리(70:02:31)가 약 49pt
     let countdownGap: CGFloat = 12        // 숫자 아래 끝 ~ 제목 글자 위 끝
@@ -89,9 +90,9 @@ final class DropTuning: ObservableObject {
     @Published var isOpen = false
 
     /// 8차 설정(= 기본값): 2026-10-31 집 맥. 7차(노치 높이 + 12, 간격 12, 붙는 거리 12, 검정 반지름 60)에
-    /// 팝업 높이 220→240, 커진 노치 너비 + 100→92, 노치와 간격 12→14를 더한 값. 조절하다가 이 값으로 되돌릴 때 쓴다.
+    /// 팝업 높이 220→240, 커진 노치 너비 + 100→92(뒤에 80으로 12 더 줄임), 노치와 간격 12→14를 더한 값. 조절하다가 이 값으로 되돌릴 때 쓴다.
     func applyEighthPreset() {
-        growWidth = 92; growHeight = 12; restWide = true; restWidth = 44; grownBottomRadius = 26; grownTopRadius = 12; popupHeight = 240
+        growWidth = 80; growHeight = 12; restWide = true; restWidth = 44; grownBottomRadius = 26; grownTopRadius = 12; popupHeight = 240
         popupRadius = 26; gap = 14; spacing = 12; grainHeight = 34; waitInset = 4
         inkDelay = 0; inkDuration = 0.65; inkNeck = true; clearGlass = true; tintOpacity = 0
         lift = 96; softness = 28.5; blackRadius = 60; sideInset = -5.5; blackOpacity = 1; overBlack = 0.65
