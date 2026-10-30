@@ -16,7 +16,7 @@ struct AccountPicker: View {
     /// 계정 한 줄 높이(이름 + 캘린더 줄 + 위아래 여백). 화면에서 잰 값. 팝업 높이 계산에 쓴다.
     static let rowHeight: CGFloat = 58
     /// 목록 끝 "Later" 줄 높이(상자 없음)
-    static let laterHeight: CGFloat = 38
+    static let laterHeight: CGFloat = 42
     /// 계정 상자와 팝업 좌우 끝 사이, 상자 안 좌우·위아래 여백
     static let sideMargin: CGFloat = 24
     static let innerH: CGFloat = 16
@@ -56,12 +56,13 @@ struct AccountPicker: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
-    /// 목록 맨 끝: 상자 없이 "Later" 글자만. 마우스를 올리면 흰색, 누르면 고르지 않고 닫는다.
+    /// 목록 맨 끝: 상자 없이 "Choose later" 글자만(검정, 계정 이름과 같은 크기 굵게). 아래 투명한 유리 위라 검정으로 쓴다.
+    /// 마우스를 올리면 살짝 옅어지고, 누르면 고르지 않고 닫는다.
     private var laterRow: some View {
         Button(action: onLater) {
-            Text("Later")
-                .font(.system(size: textSize + 3, weight: .medium))
-                .foregroundStyle(hovered == "later" ? .white : Self.light)
+            Text("Choose later")
+                .font(.system(size: textSize + 6, weight: .bold))
+                .foregroundStyle(Color.black.opacity(hovered == "later" ? 0.6 : 1))
                 .padding(.horizontal, Self.innerH)
                 .padding(.vertical, Self.innerV)
                 .frame(maxWidth: .infinity, alignment: .leading)
