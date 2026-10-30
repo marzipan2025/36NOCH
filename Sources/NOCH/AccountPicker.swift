@@ -12,7 +12,11 @@ struct AccountPicker: View {
     static let titleGap: CGFloat = 18
     static let rowGap: CGFloat = 10
     /// 계정 한 줄 높이(이름 + 캘린더 줄 + 위아래 여백). 화면에서 잰 값. 팝업 높이 계산에 쓴다.
-    static let rowHeight: CGFloat = 50
+    static let rowHeight: CGFloat = 58
+    /// 계정 상자와 팝업 좌우 끝 사이, 상자 안 좌우·위아래 여백
+    static let sideMargin: CGFloat = 24
+    static let innerH: CGFloat = 16
+    static let innerV: CGFloat = 11
 
     private static let light = Color(red: 0xcc / 255, green: 0xcc / 255, blue: 0xdd / 255)  // #ccccdd
     private static let dim = Color(red: 0x9a / 255, green: 0x9c / 255, blue: 0xb8 / 255)    // #9A9CB8
@@ -39,10 +43,11 @@ struct AccountPicker: View {
                     }
                 }
                 .defaultScrollAnchor(.top)  // 처음엔 맨 위부터
-                // 둥근 상자가 글 여백 바깥으로 10 나온다. 스크롤 뷰가 잘라 내지 않게 스크롤 뷰 자체를 넓힌다.
-                .padding(.horizontal, -10)
+
             }
         }
+        // 팝업 글 여백(22)에서 2 더 들여, 계정 상자가 팝업 좌우 끝에서 24 떨어지게. 위 제목도 상자 끝에 맞춘다.
+        .padding(.horizontal, Self.sideMargin - 22)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
@@ -74,8 +79,8 @@ struct AccountPicker: View {
                     .lineLimit(1)
                     .truncationMode(.tail)
             }
-            .padding(.horizontal, 10)
-            .padding(.vertical, 7)
+            .padding(.horizontal, Self.innerH)
+            .padding(.vertical, Self.innerV)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(RoundedRectangle(cornerRadius: 12)
                 .fill(Color.black.opacity(hovered == account.id ? 0.8 : 0.1)))
