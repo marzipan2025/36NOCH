@@ -143,12 +143,68 @@ func makeControlWindow<V: View>(title: String, on screen: NSScreen, below: CGFlo
     return window
 }
 
-/// 조절 창의 슬라이더 한 줄
+/// 조절 창의 슬라이더 한 줄. 오른쪽 수치를 누르면 입력칸으로 바뀌어 숫자로도 넣을 수 있다.
 func sliderRow(_ label: String, _ value: Binding<CGFloat>, _ range: ClosedRange<CGFloat>,
                step: CGFloat = 0.5) -> some View {
     HStack {
         Text(label).frame(width: 120, alignment: .leading)
         Slider(value: value, in: range, step: step)
-        Text(String(format: step < 0.1 ? "%.2f" : "%.1f", value.wrappedValue)).monospacedDigit().frame(width: 44)
+        NumberField(value: value, range: range, format: step < 0.1 ? "%.2f" : "%.1f")
+    }
+}
+
+/// 수치 표시. 누르면 입력칸이 되고, 리턴이나 다른 곳을 누르면 반영(범위 밖이면 범위 끝으로), esc면 취소.
+struct NumberField: View {
+    @Binding var value: CGFloat
+    let range: ClosedRange<CGFloat>
+    let format: String
+    @State private var editing = false
+    @State private var text = ""
+    @FocusState private var focused: Bool
+
+    var body: some View {
+        Group {
+            if editing {
+                TextField("", text: $text)
+                    .textFieldStyle(.plain)
+                    .multilineTextAlignment(.trailing)
+                    .monospacedDigit()
+                    .focused($focused)
+                    .onSubmit(commit)
+                    .onExitCommand { editing = false }
+                    .onChange(of: focused) { _, now in if !now { commit() } }
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+                    .background(RoundedRectangle(cornerRadius: 4).fill(Color.white.opacity(0.12)))
+                    .overlay(RoundedRectangle(cornerRadius: 4).stroke(Color.accentColor, lineWidth: 1))
+            } else {
+                Text(String(format: format, value)).monospacedDigit()
+                    .padding(.horizontal, 4)
+                    .frame(maxWidth: .infinity, alignment: .trailing)
+                    .contentShape(Rectangle())
+                    .onTapGesture { begin() }
+                    .help("눌러서 숫자 입력")
+            }
+        }
+        .frame(width: 56)
+    }
+
+    private func begin() {
+        text = String(format: format, value)
+        editing = true
+        // 입력칸이 생긴 뒤에 포커스를 주고, 기존 숫자를 모두 선택해 바로 덮어 쓸 수 있게 한다
+        DispatchQueue.main.async {
+            focused = true
+            DispatchQueue.main.async { NSApp.sendAction(#selector(NSText.selectAll(_:)), to: nil, from: nil) }
+        }
+    }
+
+    private func commit() {
+        guard editing else { return }
+        editing = false
+        let cleaned = text.trimmingCharacters(in: .whitespaces).replacingOccurrences(of: ",", with: ".")
+        if let v = Double(cleaned) {
+            value = min(max(CGFloat(v), range.lowerBound), range.upperBound)
+        }
     }
 }

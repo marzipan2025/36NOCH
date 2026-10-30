@@ -596,8 +596,7 @@ struct DropControlView: View {
             }
             .padding(16)
             Divider()
-            HStack(alignment: .top, spacing: 0) {
-                column {
+            column {
                     section("노치 확장")
                     sliderRow("너비 +", $tuning.growWidth, 0...300, step: 2)
                     sliderRow("높이 +", $tuning.growHeight, 0...60)
@@ -618,9 +617,7 @@ struct DropControlView: View {
                     section("유리")
                     Toggle("clear 유리 (끄면 regular)", isOn: $tuning.clearGlass)
                     sliderRow("검정 틴트", $tuning.tintOpacity, 0...1, step: 0.05)
-                }
-                Divider()
-                column {
+
                     section("마우스")
                     sliderRow("여는 거리(노치 좌우)", $tuning.hoverMargin, 0...200)
                     sliderRow("여는 거리(노치 아래)", $tuning.hoverDown, 0...200)
@@ -669,22 +666,28 @@ struct DropControlView: View {
                     sliderRow("밝기", $tuning.rimOpacity, 0...1, step: 0.05)
                     sliderRow("굵기", $tuning.rimWidth, 0...6)
                     sliderRow("번짐", $tuning.rimSoftness, 0...6)
-                }
             }
         }
-        .frame(width: 1000, height: 760)
+        // 검정 바탕에 맞춰 컨트롤·글자를 어두운 모양(흰 글자)으로
+        .environment(\.colorScheme, .dark)
+        .foregroundStyle(.white)
+        .background(Color.black)
+        .frame(width: 500, height: 760)
     }
 
+    /// 한 단. 항목 사이 간격은 예전 8에서 20% 늘린 9.6
     private func column<C: View>(@ViewBuilder _ content: () -> C) -> some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 8) { content() }
+            VStack(alignment: .leading, spacing: 9.6) { content() }
                 .padding(16)
         }
+        .scrollContentBackground(.hidden)
         .frame(maxWidth: .infinity)
     }
 
+    /// 중간 제목. 예전 .headline(13pt)의 두 배
     private func section(_ title: String) -> some View {
-        Text(title).font(.headline).padding(.top, 8)
+        Text(title).font(.system(size: 26, weight: .semibold)).padding(.top, 9.6)
     }
 
     /// 열 때 시간표: 노치 0초 시작 → 팝업 시작 → 팝업 끝. 막대로 겹침을 보여 준다.
@@ -699,7 +702,7 @@ struct DropControlView: View {
             GeometryReader { geo in
                 let scale = geo.size.width / total
                 VStack(alignment: .leading, spacing: 3) {
-                    Capsule().fill(.black)
+                    Capsule().fill(.white)
                         .frame(width: max(2, grow * scale), height: 6)
                     Capsule().fill(.blue)
                         .frame(width: max(2, Double(tuning.dropDuration) * scale), height: 6)
@@ -710,7 +713,7 @@ struct DropControlView: View {
                 }
             }
             .frame(height: 24)
-            Text(String(format: "노치(검정) 0 → %.2f초 · 팝업(파랑) %.2f → %.2f초 · 검정→유리(회색) %.2f → %.2f초 · 전체 %.2f초",
+            Text(String(format: "노치(흰색) 0 → %.2f초 · 팝업(파랑) %.2f → %.2f초 · 검정→유리(회색) %.2f → %.2f초 · 전체 %.2f초",
                         grow, dropStart, dropEnd, inkStart, inkEnd, total))
                 .font(.caption).foregroundStyle(.secondary)
         }
@@ -769,11 +772,17 @@ final class SiriDemo: NSObject {
         updates.start()
 
         // 설정창은 처음엔 숨겨 두고, 노치의 설정 아이콘으로 연다. 패널을 가리지 않게 오른쪽 아래에 둔다.
-        let control = makeControlWindow(title: "36NOCH 방울 팝업 조절", on: metrics.screen, below: 600,
+        let control = makeControlWindow(title: "Developer Test Setting", on: metrics.screen, below: 600,
                                         content: DropControlView(metrics: metrics, tuning: tuning))
+        // 검정 바탕: 제목 막대까지 검정으로 이어지게
+        control.appearance = NSAppearance(named: .darkAqua)
+        control.backgroundColor = .black
+        control.titlebarAppearsTransparent = true
         control.setFrameOrigin(CGPoint(x: metrics.screen.frame.maxX - control.frame.width - 20,
                                        y: metrics.screen.frame.minY + 20))
         controlWindow = control
+        // 시험용: `--test-settings` 로 띄우면 설정창을 바로 연다
+        if CommandLine.arguments.contains("--test-settings") { control.orderFrontRegardless() }
 
         // 마우스 위치를 짧은 간격으로 확인한다. 전역 이벤트 감시와 달리 손쉬운 사용 권한이 필요 없다.
         let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
