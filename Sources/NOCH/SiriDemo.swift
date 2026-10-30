@@ -74,14 +74,14 @@ final class DropTuning: ObservableObject {
         growBounce = 0.2; dropDelay = -0.7; dropDuration = 0.75; dropBounce = 0.4; closeSpeed = 0.5
     }
 
-    /// 열림 시간표(초). 스프링은 눈에 보이는 시간(duration)이 아니라 다 멈추는 시간(settlingDuration)으로 잡는다.
+    /// 열림 시간표(초). 스프링 길이는 눈에 보이게 움직이는 데까지(visibleDuration)로 잡는다.
     /// 닫힘은 이 시간표를 거꾸로 돌린다.
     var openTimeline: (grow: Spring, drop: Spring, dropStart: Double, inkStart: Double, total: Double) {
         let grow = Spring(duration: Double(growDuration), bounce: Double(growBounce))
         let drop = Spring(duration: Double(dropDuration), bounce: Double(dropBounce))
         let dropStart = max(0, Double(growDuration + dropDelay))
         let inkStart = dropStart + Double(inkDelay)
-        let total = max(grow.settlingDuration, dropStart + drop.settlingDuration, inkStart + Double(inkDuration))
+        let total = max(grow.visibleDuration, dropStart + drop.visibleDuration, inkStart + Double(inkDuration))
         return (grow, drop, dropStart, inkStart, total)
     }
 
@@ -296,9 +296,9 @@ struct DropPanelView: View {
             steps = [
                 (k * (T - line.inkStart - ink), {
                     withAnimation(.easeInOut(duration: ink * k)) { inked = true } }),
-                (k * (T - line.dropStart - line.drop.settlingDuration), {
+                (k * (T - line.dropStart - line.drop.visibleDuration), {
                     withAnimation(Animation(ReversedSpring(spring: line.drop, scale: k))) { dropped = false } }),
-                (k * (T - line.grow.settlingDuration), {
+                (k * (T - line.grow.visibleDuration), {
                     withAnimation(Animation(ReversedSpring(spring: line.grow, scale: k))) { grown = false } }),
             ]
         }
@@ -319,13 +319,27 @@ struct DropPanelView: View {
 }
 
 /// 스프링을 시간 거꾸로 재생하는 애니메이션. 열림 스프링의 끝(튕김)부터 시작해서 출발점의 느린 가속으로 끝난다.
-/// 값은 0 → value로 가야 하므로, 정방향 스프링 s(t)에 대해 value − s(D − t)를 돌려준다(D = 멈추는 시간).
+/// 값은 0 → value로 가야 하므로, 정방향 스프링 s(t)에 대해 value − s(D − t)를 돌려준다(D = visibleDuration).
+extension Spring {
+    /// 목표와의 차이가 이동 거리의 0.5% 안으로 들어온 뒤로는 눈에 안 보이는 잔떨림이다.
+    /// settlingDuration은 이 꼬리까지 포함해서 길고(튕김 0.4, 0.75초 스프링이면 1.73초),
+    /// 그대로 역재생하면 닫기 시작할 때 아무것도 안 움직이는 공백이 생긴다.
+    var visibleDuration: Double {
+        var t = settlingDuration
+        while t > 0 {
+            if abs(value(target: 1.0, time: t) - 1) > 0.005 { return t }
+            t -= 1.0 / 240
+        }
+        return 0
+    }
+}
+
 struct ReversedSpring: CustomAnimation {
     let spring: Spring
     let scale: Double   // 시간 배율
 
     func animate<V: VectorArithmetic>(value: V, time: TimeInterval, context: inout AnimationContext<V>) -> V? {
-        let duration = spring.settlingDuration
+        let duration = spring.visibleDuration
         let local = time / scale
         guard local < duration else { return nil }
         var result = value
