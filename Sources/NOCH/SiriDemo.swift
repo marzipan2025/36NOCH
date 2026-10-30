@@ -11,7 +11,7 @@ import SwiftUI
 
 import Combine
 
-/// 모든 조절 값. 기본값은 2026-10-30 사용자가 맞춘 3차 설정(+ 하단 영역).
+/// 모든 조절 값. 기본값은 2026-10-30 사용자가 맞춘 4차 설정.
 /// 바꾼 값은 UserDefaults에 저장해서 앱을 다시 켜도 이어진다.
 final class DropTuning: ObservableObject {
     // 노치 확장
@@ -24,8 +24,8 @@ final class DropTuning: ObservableObject {
     // 팝업 방울
     @Published var popupHeight: CGFloat = 220
     @Published var popupRadius: CGFloat = 26
-    @Published var gap: CGFloat = 11                 // 커진 노치 아래 끝과 팝업 위 끝 사이
-    @Published var spacing: CGFloat = 16             // GlassEffectContainer가 두 유리를 붙이는 거리
+    @Published var gap: CGFloat = 10                 // 커진 노치 아래 끝과 팝업 위 끝 사이
+    @Published var spacing: CGFloat = 14             // GlassEffectContainer가 두 유리를 붙이는 거리
     @Published var grainHeight: CGFloat = 34         // 떨어지기 전 팝업 높이(실제 노치 밑에 숨어 있음)
     @Published var waitInset: CGFloat = 4            // 대기 중 팝업을 실제 노치보다 좁힐 너비(양쪽 합). 하드웨어 노치에 완전히 가려지게
     @Published var inkDelay: CGFloat = 0             // 떨어지기 시작하고 검정이 빠지기 시작할 때까지(초)
@@ -72,8 +72,8 @@ final class DropTuning: ObservableObject {
     @Published var growDuration: CGFloat = 0.6
     @Published var growBounce: CGFloat = 0.2
     @Published var dropDelay: CGFloat = -0.7
-    @Published var dropDuration: CGFloat = 0.75
-    @Published var dropBounce: CGFloat = 0.4
+    @Published var dropDuration: CGFloat = 0.55
+    @Published var dropBounce: CGFloat = 0.2
     @Published var closeSpeed: CGFloat = 0.5         // 닫힘은 열림의 정확한 역재생. 이 값은 시간 배율(1 = 열 때와 같은 속도, 작을수록 빠름)
 
     // 마우스
@@ -85,17 +85,18 @@ final class DropTuning: ObservableObject {
     /// 바뀔 때마다 패널이 열기/닫기 모션을 한다. 마우스 위치(SiriDemo)나 설정창 버튼이 바꾼다.
     @Published var isOpen = false
 
-    /// 3차 설정(= 기본값): 2026-10-30 회사 맥에서 사용자가 맞춘 값. 조절하다가 이 값으로 되돌릴 때 쓴다.
-    func applyThirdPreset() {
+    /// 4차 설정(= 기본값): 2026-10-30 회사 맥에서 사용자가 맞춘 값. 3차에서 간격 11→10, 유리 붙는 거리 16→14,
+    /// 떨어지는 시간 0.75→0.55, 튕김 0.4→0.2. 조절하다가 이 값으로 되돌릴 때 쓴다.
+    func applyFourthPreset() {
         growWidth = 100; growHeight = 8; restWide = true; restWidth = 48; grownBottomRadius = 26; grownTopRadius = 12; popupHeight = 220
-        popupRadius = 26; gap = 11; spacing = 16; grainHeight = 34; waitInset = 4
+        popupRadius = 26; gap = 10; spacing = 14; grainHeight = 34; waitInset = 4
         inkDelay = 0; inkDuration = 0.65; inkNeck = true; clearGlass = true; tintOpacity = 0
         lift = 35.5; softness = 22.5; blackRadius = 60; sideInset = -10; blackOpacity = 1; overBlack = 0.5
         trayHeight = 60; trayMargin = 20; trayOpacity = 0.1; trayConcentric = true
         trayRadiusPlus = 4; trayDelay = -0.2; trayFade = 0.3; trayCapsule = true; popupBottomConcentric = true
         rimOpacity = 0.05; rimWidth = 1; rimSoftness = 1.5; shadowOpacity = 0.3; shadowRadius = 28
         shadowY = 14.5; growDuration = 0.6
-        growBounce = 0.2; dropDelay = -0.7; dropDuration = 0.75; dropBounce = 0.4; closeSpeed = 0.5
+        growBounce = 0.2; dropDelay = -0.7; dropDuration = 0.55; dropBounce = 0.2; closeSpeed = 0.5
     }
 
     // MARK: 저장
@@ -529,7 +530,7 @@ struct DropControlView: View {
                 Button("닫기") { tuning.isOpen = false }
                 Button("다시 재생") { replay() }
                 Spacer()
-                Button("3차설정") { tuning.applyThirdPreset(); replay() }
+                Button("4차설정") { tuning.applyFourthPreset(); replay() }
                 Button("종료") { NSApp.terminate(nil) }
             }
             .padding(16)
