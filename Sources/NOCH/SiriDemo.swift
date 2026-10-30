@@ -341,9 +341,7 @@ struct DropPanelView: View {
                             let alert = left <= 5 * 60 || (left > 10 * 60 - 10 && left <= 10 * 60)
                             let blinking = left <= 0 && left > -CalendarFeed.blink
                             clockColumn(text: countdownText(to: next.start, now: now), title: calendar.summary,
-                                        color: alert ? (1, 0x3b / 255, 0x30 / 255)  // #ff3b30
-                                             : left >= 3600 ? (0x68 / 255, 0x6b / 255, 0x88 / 255)  // 1시간 이상(HH:MM) #686B88
-                                                     : (1, 0xd7 / 255, 0),  // Gold #ffd700
+                                        color: clockColor(alert: alert, left: left),
                                         clockVisible: !blinking || Int(now.timeIntervalSinceReferenceDate * 2) % 2 == 0,
                                         onTitle: openCalendarApp)
                         } else {
@@ -390,6 +388,13 @@ struct DropPanelView: View {
         }
         // 숫자 위 끝이 오른쪽 날짜 글자 위 끝과 같은 높이에 오도록 끌어올린다
         .padding(.top, smallCapTop - size * ClockFont.capTop - tuning.countdownLift)
+    }
+
+    /// 시계 색: 알림 중 #ff3b30, 1시간 이상 남음(HH:MM) #686B88, 그 밖에 금색 #ffd700
+    private func clockColor(alert: Bool, left: TimeInterval) -> (r: Double, g: Double, b: Double) {
+        if alert { return (1, 0x3b / 255, 0x30 / 255) }
+        if left >= 3600 { return (0x68 / 255, 0x6b / 255, 0x88 / 255) }
+        return (1, 0xd7 / 255, 0)
     }
 
     /// 제목 색: 시계 색의 70%. 누를 수 있는 제목에 마우스를 올리면 흰색을 30% 섞는다.
