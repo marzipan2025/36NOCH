@@ -178,9 +178,13 @@ enum GoHome {
 }
 
 /// 시계 글꼴. 숫자는 가장 넓은 숫자 폭의 칸에 하나씩 넣어(고정폭처럼) 초가 바뀌어도 폭이 흔들리지 않게 한다.
-/// 글자 크기는 정해진 너비에 맞춰 글자 수로 정한다.
+/// 글자 크기는 정해진 너비에 맞춰 글자 수로 정한다. 숫자마다 Distro 네 가지 중 하나를 무작위로 쓴다(DigitFonts).
+/// 콜론과 위치 계산(높이·내림)은 DistroMix 기준.
 enum ClockFont {
     static let name = "DistroMix"
+    /// 숫자에 무작위로 쓰는 글꼴 네 가지. 맥에 없는 글꼴은 빠진다(집 맥에 없으면 시스템 글꼴로 나온다).
+    static let digitNames = ["DistroLight", "DistroMix", "Distro-Bold", "DistroHeavy"]
+        .filter { NSFont(name: $0, size: 1) != nil }
     private static let unit = NSFont(name: name, size: 1) ?? .systemFont(ofSize: 1)
     static var descent: CGFloat { -unit.descender }
     /// 프레임 위 ~ 숫자 위 끝(1pt 기준)
@@ -189,7 +193,11 @@ enum ClockFont {
     private static func width(_ s: String) -> CGFloat {
         (s as NSString).size(withAttributes: [.font: unit]).width
     }
-    private static let digitCell: CGFloat = "0123456789".map { width(String($0)) }.max() ?? 0.6
+    /// 네 글꼴 숫자 중 가장 넓은 폭. 어느 글꼴이 걸려도 칸 너비가 같다.
+    private static let digitCell: CGFloat = (digitNames.isEmpty ? [name] : digitNames).flatMap { f -> [CGFloat] in
+        let font = NSFont(name: f, size: 1) ?? unit
+        return "0123456789".map { (String($0) as NSString).size(withAttributes: [.font: font]).width }
+    }.max() ?? 0.6
 
     /// 1pt 기준 칸 너비
     static func cell(_ c: Character) -> CGFloat { c.isNumber ? digitCell : width(String(c)) }
@@ -206,18 +214,44 @@ private func say(_ items: Any...) {
     FileHandle.standardError.write(line.data(using: .utf8)!)
 }
 
-/// 시계 글자. 글자마다 칸을 나눠 그린다(숫자 칸은 모두 같은 폭).
+/// 자리마다 숫자 글꼴을 기억한다. 그 자리 숫자가 바뀔 때만 네 가지 중 하나를 새로 뽑는다(0.5초마다 다시 그려도 그대로).
+final class DigitFonts {
+    private var chars: [Character] = []
+    private var fonts: [String] = []
+
+    func fonts(for text: String) -> [String] {
+        let new = Array(text)
+        if new.count != chars.count { chars = []; fonts = [] }  // 형식이 바뀌면(MM:SS → N days 등) 모두 다시 뽑는다
+        for (i, c) in new.enumerated() {
+            if i < chars.count && chars[i] == c { continue }
+            let pick = c.isNumber ? (ClockFont.digitNames.randomElement() ?? ClockFont.name) : ClockFont.name
+            if i < fonts.count { fonts[i] = pick } else { fonts.append(pick) }
+        }
+        chars = new
+        return fonts
+    }
+}
+
+/// 시계 글자. 글자마다 칸을 나눠 그린다(숫자 칸은 모두 같은 폭). 글꼴이 섞여도 바닥선을 맞춘다.
+/// colonBlink면 콜론이 1초에 한 번 깜빡인다(앞 0.5초 보임, 뒤 0.5초 숨김).
 struct ClockText: View {
     let text: String
     let size: CGFloat
+    var colonBlink = false
+    var now = Date()
+    @State private var picker = DigitFonts()
 
     var body: some View {
-        HStack(spacing: 0) {
-            ForEach(Array(text.enumerated()), id: \.offset) { _, c in
-                Text(String(c)).frame(width: ClockFont.cell(c) * size)
+        let fonts = picker.fonts(for: text)
+        let colonOn = !colonBlink || now.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1) < 0.5
+        HStack(alignment: .lastTextBaseline, spacing: 0) {
+            ForEach(Array(text.enumerated()), id: \.offset) { i, c in
+                Text(String(c))
+                    .font(.custom(i < fonts.count ? fonts[i] : ClockFont.name, size: size))
+                    .frame(width: ClockFont.cell(c) * size)
+                    .opacity(c == ":" && !colonOn ? 0 : 1)
             }
         }
-        .font(.custom(ClockFont.name, size: size))
         .fixedSize()
     }
 }

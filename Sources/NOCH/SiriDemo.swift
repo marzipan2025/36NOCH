@@ -323,8 +323,9 @@ struct DropPanelView: View {
                     .opacity(trayShown ? 1 : 0)
                 rim
                 // 왼쪽: 남은 시간(금색) 아래에 회의 제목(어두운 금색). 오른쪽: 날짜·시각 두 줄.
-                // 0.5초마다 다시 그린다(남은 시간, 퇴근 알림, 00:00 깜빡임).
-                TimelineView(.periodic(from: .now, by: 0.5)) { context in
+                // 0.5초마다 다시 그린다(남은 시간, 퇴근 알림, 00:00 깜빡임, 콜론 깜빡임).
+                // 초 경계에서 시작해 숫자와 콜론이 같은 순간에 바뀌게 한다.
+                TimelineView(.periodic(from: Date(timeIntervalSinceReferenceDate: Date().timeIntervalSinceReferenceDate.rounded(.down)), by: 0.5)) { context in
                     let now = context.date
                     // 퇴근 알림은 닫힘 모션이 끝날 때까지(10초 + 2초) 그대로 보여 준다
                     let home = GoHome.isTime(now, seconds: GoHome.seconds + 2)
@@ -343,6 +344,7 @@ struct DropPanelView: View {
                             clockColumn(text: countdownText(to: next.start, now: now), title: calendar.summary,
                                         color: clockColor(alert: alert, left: left),
                                         clockVisible: !blinking || Int(now.timeIntervalSinceReferenceDate * 2) % 2 == 0,
+                                        colonBlink: left > 0 && left < 3600, now: now,
                                         onTitle: openCalendarApp)
                         } else {
                             Text(calendar.summary)
@@ -371,7 +373,8 @@ struct DropPanelView: View {
     /// 왼쪽 시계와 그 아래 제목. 너비를 고정한 시계는 글자 수가 줄면 커져 아래로 늘어나고 제목은 그만큼 밀린다.
     /// 제목은 늘 시계 색을 70%로 어둡게 한 색.
     private func clockColumn(text: String, title: String, color: (r: Double, g: Double, b: Double),
-                             clockVisible: Bool = true, onTitle: (() -> Void)? = nil) -> some View {
+                             clockVisible: Bool = true, colonBlink: Bool = false, now: Date = Date(),
+                             onTitle: (() -> Void)? = nil) -> some View {
         let size = ClockFont.size(for: text, width: tuning.countdownWidth)
         let small = NSFont.systemFont(ofSize: tuning.textSize, weight: .light)
         let smallCapTop = small.ascender - small.capHeight  // 작은 글 프레임 위 ~ 글자 위 끝
@@ -380,7 +383,7 @@ struct DropPanelView: View {
         let titleFont = NSFont.systemFont(ofSize: titleSize, weight: .light)
         let titleCapTop = titleFont.ascender - titleFont.capHeight
         return VStack(alignment: .leading, spacing: tuning.countdownGap - titleCapTop - size * ClockFont.descent) {
-            ClockText(text: text, size: size)
+            ClockText(text: text, size: size, colonBlink: colonBlink, now: now)
                 .foregroundStyle(Color(red: color.r, green: color.g, blue: color.b))
                 .offset(x: tuning.countdownX)
                 .opacity(clockVisible ? 1 : 0)
