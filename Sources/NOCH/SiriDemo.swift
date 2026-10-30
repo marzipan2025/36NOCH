@@ -345,7 +345,8 @@ struct DropPanelView: View {
                 // 초 경계에서 시작해 숫자와 콜론이 같은 순간에 바뀌게 한다.
                 // 계정을 고르는 중이면 시계 자리에 계정 목록(AccountPicker)
                 Group { if calendar.picking {
-                    AccountPicker(calendar: calendar, textSize: tuning.textSize)
+                    AccountPicker(calendar: calendar, textSize: tuning.textSize,
+                                  onLater: { calendar.later(); tuning.isOpen = false })
                         // 계정마다 검정 상자에 담기므로 아래 투명한 유리까지 내려가도 된다. 아래 여백은 위(textTop)와 같게.
                         .frame(height: max(0, popupSize.height - tuning.textTop * 2))
                 } else {
@@ -982,7 +983,8 @@ extension DropTuning {
         guard calendar.picking, calendar.status != .denied, !calendar.accounts.isEmpty else { return popupHeight }
         let top = metrics.height + growHeight + gap  // 화면 위 끝 ~ 팝업 위 끝
         let n = CGFloat(calendar.accounts.count)
-        let list = 16 + AccountPicker.titleGap + n * AccountPicker.rowHeight + (n - 1) * AccountPicker.rowGap
+        let list = 16 + AccountPicker.titleGap + n * AccountPicker.rowHeight + n * AccountPicker.rowGap
+            + AccountPicker.laterHeight  // 맨 끝 "Later"
         let needed = textTop + list + textTop
         let limit = min(metrics.screen.frame.height / 2, 620 - 40) - top
         return max(popupHeight, min(needed, limit))

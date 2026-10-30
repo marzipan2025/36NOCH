@@ -38,6 +38,8 @@ final class CalendarFeed: ObservableObject {
     /// 팝업에서 계정을 고르는 중인지. 고르는 동안은 마우스와 상관없이 팝업을 열어 둔다.
     @Published private(set) var picking = false
     @Published private(set) var accounts: [Account] = []
+    /// 목록 끝 "Later"를 누르면 이번 실행 동안은 계정 고르기를 저절로 띄우지 않는다
+    private var pickingDismissed = false
 
     /// 고른 계정(EKSource.sourceIdentifier)을 저장하는 키
     private static let sourceKey = "calendarSourceID"
@@ -152,7 +154,7 @@ final class CalendarFeed: ObservableObject {
 
     /// 저절로 띄우는 경우(첫 실행, 고른 계정이 없어짐, 권한 거부)
     private func offerPicking() {
-        guard !picking else { return }
+        guard !picking, !pickingDismissed else { return }
         startPicking()
     }
 
@@ -160,6 +162,12 @@ final class CalendarFeed: ObservableObject {
     func startPicking() {
         if status != .denied { loadAccounts() }
         picking = true
+    }
+
+    /// 목록 끝 "Later": 고르지 않고 닫는다. 메뉴의 "캘린더 계정…"이나 안내 글을 누르면 다시 연다.
+    func later() {
+        picking = false
+        pickingDismissed = true
     }
 
     func choose(_ account: Account) {

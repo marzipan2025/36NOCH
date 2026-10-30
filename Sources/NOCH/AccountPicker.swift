@@ -6,6 +6,8 @@ import SwiftUI
 struct AccountPicker: View {
     @ObservedObject var calendar: CalendarFeed
     let textSize: CGFloat
+    /// 목록 끝 "Later"를 눌렀을 때(고르기를 끝내고 팝업을 닫는다)
+    let onLater: () -> Void
     @State private var hovered: String?
 
     /// 위 제목과 첫 계정 사이, 계정과 계정 사이
@@ -13,6 +15,8 @@ struct AccountPicker: View {
     static let rowGap: CGFloat = 10
     /// 계정 한 줄 높이(이름 + 캘린더 줄 + 위아래 여백). 화면에서 잰 값. 팝업 높이 계산에 쓴다.
     static let rowHeight: CGFloat = 58
+    /// 목록 끝 "Later" 줄 높이(상자 없음)
+    static let laterHeight: CGFloat = 38
     /// 계정 상자와 팝업 좌우 끝 사이, 상자 안 좌우·위아래 여백
     static let sideMargin: CGFloat = 24
     static let innerH: CGFloat = 16
@@ -40,6 +44,7 @@ struct AccountPicker: View {
                 ScrollView(.vertical, showsIndicators: false) {
                     VStack(alignment: .leading, spacing: Self.rowGap) {
                         ForEach(calendar.accounts) { row($0) }
+                        laterRow
                     }
                 }
                 .defaultScrollAnchor(.top)  // 처음엔 맨 위부터
@@ -51,6 +56,23 @@ struct AccountPicker: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
+    /// 목록 맨 끝: 상자 없이 "Later" 글자만. 마우스를 올리면 흰색, 누르면 고르지 않고 닫는다.
+    private var laterRow: some View {
+        Button(action: onLater) {
+            Text("Later")
+                .font(.system(size: textSize + 3, weight: .medium))
+                .foregroundStyle(hovered == "later" ? .white : Self.light)
+                .padding(.horizontal, Self.innerH)
+                .padding(.vertical, Self.innerV)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .focusable(false)
+        .focusEffectDisabled()
+        .onHover { hovered = $0 ? "later" : (hovered == "later" ? nil : hovered) }
+    }
+
     private func message(_ text: String, action: @escaping () -> Void) -> some View {
         Text(text)
             .font(.system(size: textSize + 2, weight: .regular))
@@ -60,7 +82,7 @@ struct AccountPicker: View {
             .onTapGesture(perform: action)
     }
 
-    /// 계정 한 칸: 12pt 둥근 상자(검정 0.1, 롤오버 0.8) 안에 이름(지금 쓰는 계정이면 금색 점)과 캘린더 이름들.
+    /// 계정 한 칸: 24pt 둥근 상자(검정 0.1, 롤오버 0.8) 안에 이름(지금 쓰는 계정이면 금색 점)과 캘린더 이름들.
     private func row(_ account: CalendarFeed.Account) -> some View {
         let current = account.id == calendar.selectedID
         return Button { calendar.choose(account) } label: {
@@ -82,7 +104,7 @@ struct AccountPicker: View {
             .padding(.horizontal, Self.innerH)
             .padding(.vertical, Self.innerV)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .background(RoundedRectangle(cornerRadius: 12)
+            .background(RoundedRectangle(cornerRadius: 24)
                 .fill(Color.black.opacity(hovered == account.id ? 0.8 : 0.1)))
             .contentShape(Rectangle())
         }
