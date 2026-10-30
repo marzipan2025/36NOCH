@@ -199,6 +199,13 @@ enum ClockFont {
         guard let font = NSFont(name: f, size: 1), font.capHeight > 0 else { return 1 }
         return unit.capHeight / font.capHeight
     }
+    /// 배율 적용한 그 글꼴의 위 높이(프레임 위 ~ 바닥선, 1pt 기준). 글자 칸을 DistroMix 높이로 고정하고
+    /// 이 차이만큼 내려서 바닥선을 맞춘다. 바닥선 맞춤(HStack)으로 두면 줄 위 끝이 가장 높은 글꼴을 따라가서,
+    /// Light 숫자가 들어올 때마다 시계 전체가 약 1pt 오르내렸다.
+    static func ascender(_ f: String) -> CGFloat {
+        (NSFont(name: f, size: 1)?.ascender ?? unit.ascender) * scale(f)
+    }
+    static var lineHeight: CGFloat { unit.ascender - unit.descender }
     /// 네 글꼴 숫자(배율 적용) 중 가장 넓은 폭. 어느 글꼴이 걸려도 칸 너비가 같다.
     private static let digitCell: CGFloat = (digitNames.isEmpty ? [name] : digitNames).flatMap { f -> [CGFloat] in
         let font = NSFont(name: f, size: scale(f)) ?? unit
@@ -238,7 +245,7 @@ final class DigitFonts {
     }
 }
 
-/// 시계 글자. 글자마다 칸을 나눠 그린다(숫자 칸은 모두 같은 폭). 글꼴이 섞여도 바닥선을 맞춘다.
+/// 시계 글자. 글자마다 칸을 나눠 그린다(숫자 칸은 모두 같은 폭, 높이는 DistroMix 줄 높이로 고정). 글꼴이 섞여도 바닥선을 맞춘다.
 /// colonBlink면 콜론이 1초에 한 번 깜빡인다(앞 0.5초 보임, 뒤 0.5초 숨김).
 struct ClockText: View {
     let text: String
@@ -250,12 +257,15 @@ struct ClockText: View {
     var body: some View {
         let fonts = picker.fonts(for: text)
         let colonOn = !colonBlink || now.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1) < 0.5
-        HStack(alignment: .lastTextBaseline, spacing: 0) {
+        HStack(alignment: .top, spacing: 0) {
             ForEach(Array(text.enumerated()), id: \.offset) { i, c in
+                let f = i < fonts.count ? fonts[i] : ClockFont.name
                 Text(String(c))
-                    .font(i < fonts.count ? .custom(fonts[i], size: size * ClockFont.scale(fonts[i]))
-                                          : .custom(ClockFont.name, size: size))
-                    .frame(width: ClockFont.cell(c) * size)
+                    .font(.custom(f, size: size * ClockFont.scale(f)))
+                    .fixedSize()
+                    // 글꼴이 바뀌어도 칸 높이·바닥선이 DistroMix와 같게
+                    .offset(y: (ClockFont.ascender(ClockFont.name) - ClockFont.ascender(f)) * size)
+                    .frame(width: ClockFont.cell(c) * size, height: ClockFont.lineHeight * size, alignment: .top)
                     .opacity(c == ":" && !colonOn ? 0 : 1)
             }
         }
