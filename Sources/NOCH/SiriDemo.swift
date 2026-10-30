@@ -375,12 +375,17 @@ struct DropPanelView: View {
         let size = ClockFont.size(for: text, width: tuning.countdownWidth)
         let small = NSFont.systemFont(ofSize: tuning.textSize, weight: .light)
         let smallCapTop = small.ascender - small.capHeight  // 작은 글 프레임 위 ~ 글자 위 끝
-        return VStack(alignment: .leading, spacing: tuning.countdownGap - smallCapTop - size * ClockFont.descent) {
+        // 제목은 오른쪽 날짜 글보다 2 크게. 시계와의 간격은 제목 글자 위 끝 기준이라 제목 글꼴로 잰다.
+        let titleSize = tuning.textSize + 2
+        let titleFont = NSFont.systemFont(ofSize: titleSize, weight: .light)
+        let titleCapTop = titleFont.ascender - titleFont.capHeight
+        return VStack(alignment: .leading, spacing: tuning.countdownGap - titleCapTop - size * ClockFont.descent) {
             ClockText(text: text, size: size)
                 .foregroundStyle(Color(red: color.r, green: color.g, blue: color.b))
                 .offset(x: tuning.countdownX)
                 .opacity(clockVisible ? 1 : 0)
             Text(title)
+                .font(.system(size: titleSize, weight: .light))
                 .foregroundStyle(titleColor(color, hover: onTitle != nil && hoverTitle))
                 .offset(x: -1, y: 2)  // 좌우 여백 22에서 왼쪽으로 1, 아래로 2
                 .onHover { hoverTitle = $0 }
