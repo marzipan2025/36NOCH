@@ -41,6 +41,7 @@ zip은 릴리스에 하나만 올린다(앱이 `.zip`으로 끝나는 첫 첨부
 
 - 실행 10초 뒤, 그 뒤 6시간마다 공개 GitHub API(`releases/latest`)를 읽어 지금 버전과 비교한다. 메뉴 막대 메뉴의 "업데이트 확인…"으로도.
 - 새 버전이 있으면 메뉴 항목이 "<버전>(으)로 업데이트"가 되고, 노치를 열면 왼쪽 아이콘이 금색(#ffd700). 둘 중 하나를 누르면 zip을 받아 풀고 → 실행 중인 번들 옆에 스테이징 → 번들 ID 확인 → 번들을 바꾸고 → 종료 뒤 새 앱을 띄운다.
+- 완료 표시: 업데이트 직전에 `updatedToVersion`(UserDefaults)에 새 버전을 적어 두고, 새로 뜬 앱이 자기 버전과 같으면 지우면서 노치 왼쪽 아이콘을 1초간 파랗게(#0A84FF, 번짐 포함) 빛낸 뒤 0.6초에 걸쳐 원래 색으로. 실측(집 맥): 실행 약 3초 뒤 노치가 그려지자마자 파래져 약 1초 유지, 4.5초쯤 원래 색. 이 표시는 받는 쪽 버전에 들어 있어야 하므로 0.0.3 → 0.0.4 업데이트부터 보인다. 시험: `--test-update-flash` 인자, 또는 `defaults write com.artbrain.noch updatedToVersion <설치된 버전>` 뒤 실행.
 - 실행 중인 번들 자리(`Bundle.main.bundleURL`)를 바꾸므로, `build/`의 시험 빌드를 띄운 채 업데이트하면 `/Applications`가 아니라 그 사본이 바뀐다. `swift build` 실행 파일은 확인하지 않는다.
 - 서명: `build-app.sh`는 Apple Development 인증서가 있으면 그것으로, 없으면 ad-hoc으로 서명한다. ad-hoc은 빌드마다 서명이 달라져서 업데이트할 때마다 캘린더 권한을 다시 묻는다. 집 맥은 `Apple Development: emile.byeongsu@gmail.com (Q875UL5S23)`. 서명한 인증서가 바뀌면(다른 맥 인증서, ad-hoc) 그 업데이트 뒤 한 번 다시 묻는다.
 - 시험: 앱 사본을 만들어 `NOCH_UPDATE_CURRENT_VERSION=0.0.1 <사본>/36NOCH.app/Contents/MacOS/NOCH --test-update` → 바로 확인하고 묻지 않고 설치·재실행. 2026-10-31 집 맥에서 0.0.1 → v0.0.2 성공.

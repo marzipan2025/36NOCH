@@ -1,5 +1,6 @@
 import AppKit
 import Foundation
+import SwiftUI
 
 /// 인앱 업데이트. 02rapi의 AppUpdater 방식을 따른다.
 /// GitHub 릴리스(marzipan2025/36NOCH, 공개)의 latest 태그를 현재 버전과 비교하고, 첨부된 zip을 내려받아
@@ -16,6 +17,11 @@ final class UpdateFeed: ObservableObject {
 
     @Published private(set) var available: AppRelease?
     @Published private(set) var state: State = .idle
+    /// 업데이트 뒤 첫 실행에서 노치 왼쪽 아이콘을 파랗게 빛내는 동안 true
+    @Published private(set) var flash = false
+
+    /// 업데이트 직전에 새 버전을 적어 두는 키. 새로 뜬 앱이 자기 버전과 같으면 "업데이트됨"으로 보고 지운다.
+    private static let updatedKey = "updatedToVersion"
 
     private static let latestReleaseAPI = URL(string: "https://api.github.com/repos/marzipan2025/36NOCH/releases/latest")!
     /// 처음 확인은 실행 10초 뒤(캘린더 권한 창 등과 겹치지 않게), 그 뒤로 6시간마다
@@ -36,8 +42,11 @@ final class UpdateFeed: ObservableObject {
     /// 시험용: `--test-update` 로 띄우면 바로 확인하고, 새 버전이 있으면 묻지 않고 설치한다.
     /// 예: NOCH_UPDATE_CURRENT_VERSION=0.0.1 <사본>/36NOCH.app/Contents/MacOS/NOCH --test-update
     private static let testUpdate = CommandLine.arguments.contains("--test-update")
+    /// 시험용: `--test-update-flash` 로 띄우면 업데이트 뒤처럼 아이콘을 한 번 빛낸다
+    private static let testFlash = CommandLine.arguments.contains("--test-update-flash")
 
     func start() {
+        if Self.consumeJustUpdated() || Self.testFlash { flashOnce() }
         guard Self.isEnabled else { return }
         if Self.testUpdate {
             Task { if await check() == true { install() } }
@@ -84,6 +93,23 @@ final class UpdateFeed: ObservableObject {
         return true
     }
 
+    /// 업데이트 완료 표시: 앱이 다 뜨고 1초 뒤 파랗게 켜서 1초 두었다가 서서히 원래 색으로
+    private func flashOnce() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+            withAnimation(.easeIn(duration: 0.15)) { self?.flash = true }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in
+                withAnimation(.easeOut(duration: 0.6)) { self?.flash = false }
+            }
+        }
+    }
+
+    /// 업데이트 직후 첫 실행이면 true(한 번만)
+    private static func consumeJustUpdated() -> Bool {
+        guard let v = UserDefaults.standard.string(forKey: updatedKey) else { return false }
+        UserDefaults.standard.removeObject(forKey: updatedKey)
+        return v == currentVersion
+    }
+
     /// 내려받아 바꾸고 다시 띄운다. 성공하면 이 프로세스는 끝난다.
     func install() {
         guard let release = available, state != .installing else { return }
@@ -91,6 +117,7 @@ final class UpdateFeed: ObservableObject {
         Task {
             do {
                 let installed = try await Self.downloadAndInstall(release)
+                UserDefaults.standard.set(release.version, forKey: Self.updatedKey)
                 Self.relaunch(bundle: installed.bundle, leftover: installed.leftover)
             } catch {
                 state = .failed(error.localizedDescription)

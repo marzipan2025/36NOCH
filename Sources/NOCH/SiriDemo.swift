@@ -252,6 +252,7 @@ struct DropPanelView: View {
     /// 노치 좌우의 14pt 아이콘 버튼 두 개(IconShape.left / right, 다운로드한 SVG). 닫혀 있을 때는 실제(하드웨어) 노치 좌우 끝에 바짝 붙어 #181818,
     /// 열리면 #24252F가 되고 노치가 넓어지는 만큼 바깥으로 함께 움직인다. 높이는 늘 노치 높이 가운데.
     /// 오른쪽 원이 설정창을 연다. 왼쪽 원은 새 버전이 있을 때만 금색(#ffd700)이 되고, 누르면 업데이트한다.
+    /// 업데이트가 끝나고 다시 뜨면 왼쪽 원이 1초간 파랗게(#0A84FF) 빛났다가 원래 색으로 돌아간다.
     @State private var hoverLeft = false
     @State private var hoverRight = false
     @State private var hoverTitle = false
@@ -269,11 +270,15 @@ struct DropPanelView: View {
         let hover = Color(red: 0x30 / 255, green: 0x32 / 255, blue: 0x43 / 255)
         let update = updates.available != nil
         let gold = Color(red: 1, green: 0xd7 / 255, blue: 0)
-        let leftColor = update ? (grown && hoverLeft ? gold.mix(with: .white, by: 0.3) : gold)
+        // 업데이트 뒤 첫 실행에서 1초간 파랗게 빛난다(UpdateFeed.flash)
+        let blue = Color(red: 0x0a / 255, green: 0x84 / 255, blue: 1)  // #0A84FF
+        let leftColor = updates.flash ? blue
+                      : update ? (grown && hoverLeft ? gold.mix(with: .white, by: 0.3) : gold)
                                : (grown && hoverLeft ? hover : color)
         return ZStack {
             Button(action: { updates.install() }) {
                 IconShape.left.fill(leftColor).frame(width: d, height: d)
+                    .shadow(color: blue.opacity(updates.flash ? 0.9 : 0), radius: 4)
                     .frame(width: 24, height: 24)
                     .contentShape(Rectangle())
             }
