@@ -63,7 +63,8 @@ final class DropTuning: ObservableObject {
     let textSize: CGFloat = 11
     let textPadding: CGFloat = 22
     let textTop: CGFloat = 38                // 팝업 위 끝 ~ 시계·글 위 끝(2026-10-31 18에서 20 내림, 팝업 높이도 20 늘림)
-    let popupExtraWidth: CGFloat = 24        // 팝업이 커진 노치보다 넓은 양(양쪽 합, 한쪽 12)
+    let popupSideExtra: CGFloat = 12         // 시계·글·하단 영역은 그대로 두고 팝업만 좌우로 더 넓힌 양(한쪽). 그만큼 안쪽 여백이 는다
+    var popupExtraWidth: CGFloat { 24 + popupSideExtra * 2 }  // 팝업이 커진 노치보다 넓은 양(양쪽 합)
     // 다음 회의까지 남은 시간(Distro Mix, 금색). 너비를 고정하고, 글자 수가 줄면 그만큼 글자가 커져 아래로 늘어난다.
     let countdownWidth: CGFloat = 204     // 시계 너비. 204면 8자리(70:02:31)가 약 49pt
     let countdownGap: CGFloat = 12        // 숫자 아래 끝 ~ 제목 글자 위 끝
@@ -391,7 +392,7 @@ struct DropPanelView: View {
                 } }
                     .font(.system(size: tuning.textSize, weight: .light))
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, tuning.textPadding)
+                    .padding(.horizontal, tuning.textPadding + tuning.popupSideExtra)
                     .padding(.top, tuning.textTop)
                     .opacity(dropped ? 1 : 0)
             }
@@ -471,7 +472,8 @@ struct DropPanelView: View {
         let margin = tuning.trayMargin
         return RoundedRectangle(cornerRadius: trayRadius)
             .fill(style)
-            .frame(width: max(0, popupSize.width - margin * 2), height: tuning.trayHeight)
+            // 좌우 여백에는 팝업만 넓힌 양(popupSideExtra)을 더해 하단 영역 크기·위치는 그대로
+            .frame(width: max(0, popupSize.width - (margin + tuning.popupSideExtra) * 2), height: tuning.trayHeight)
             .padding(.bottom, margin)
             .frame(width: popupSize.width, height: popupSize.height, alignment: .bottom)
     }
