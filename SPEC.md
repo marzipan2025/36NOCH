@@ -1,13 +1,14 @@
 # 36NOCH 명세 (초안)
 
-> 2026-10-30 초안. 아직 코드가 없으므로 계획이다. 코드가 생기면 실제 값으로 고친다.
+> 2026-10-30 초안. 1단계(노치 창 기초) 진행 중. 실제 값은 코드와 RESEARCH §3.5 기준.
 
 | 항목 | 값(예정) |
 |---|---|
 | 앱 이름 / 실행 파일 | `36NOCH` / `NOCH` |
 | 번들 ID | `com.artbrain.noch` |
 | 최소 macOS | 14.0 (집 맥 26.6.2, 회사 맥 27.0.1) |
-| 구조 | SwiftPM 실행 타깃 + `build-app.sh`로 .app 포장 (33RUVI와 같은 방식) |
+| 구조 | SwiftPM 실행 타깃 + `build-app.sh`로 .app 포장 (34VITE와 같은 방식). 버전은 `build-app.sh`의 `VERSION` |
+| 형태 | 메뉴 막대 앱(독 아이콘 없음, `LSUIElement`) |
 | UI | SwiftUI + AppKit(`NSPanel`) |
 | 서명 | ad-hoc |
 | 배포 | `gh release`로 두 맥에 설치. 인앱 업데이트는 나중에 |

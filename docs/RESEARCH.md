@@ -197,6 +197,15 @@ macOS 12+의 `NSScreen` API:
 - 마우스 위치는 `NSEvent.mouseLocation`을 1/60초마다 읽는다(전역 이벤트 감시와 달리 손쉬운 사용 권한 불필요). 열려 있을 때만 `ignoresMouseEvents = false`.
 - 설정창은 숨겨 두고, 커진 노치 오른쪽 검정 영역(하드웨어 노치 오른쪽 끝 ~ 커진 노치 오른쪽 끝) 한가운데의 12×12pt 톱니바퀴(#666666)로 연다. 설정창이 떠 있는 동안은 펼친 채 유지(토글).
 - 비활성 패널에서 첫 클릭이 버튼에 가도록 `NSHostingView.acceptsFirstMouse`를 true로.
+- 노치 패널(1000×620)은 펼쳐져 있어도 마우스가 커진 노치+팝업 위일 때만 클릭을 받는다. 창 전체가 받게 했더니 겹친 설정창의 제목 막대·버튼 클릭을 가로채서 설정창을 닫을 수 없었다.
+- 노치 패널은 "마지막 창"으로 세지 않아서, `applicationShouldTerminateAfterLastWindowClosed`가 true면 설정창을 닫는 순간 앱이 종료됐다(닫기 모션 없이 사라짐). 방울 팝업 모드에서는 false.
+
+**3차 설정 (2026-10-30 회사 맥, 지금 기본값, `DropTuning.applyThirdPreset`)**: 2차에서 검정 모서리 74.5 → **60**, 양옆 −30 → **−10**, 유리 위 덧칠 **0.5**(새 항목)만 바뀜.
+
+- **유리 위 덧칠**: 검정을 유리 아래에만 깔면 유리가 빛을 더해 회색빛으로 들뜬다. 같은 흐린 검정 모양을 유리 위에도 반투명으로 한 번 더 얹는다. 1이면 매트한 평면과 같아짐.
+- **값 저장**: 조절 값은 UserDefaults(`dropTuning` 사전)에 저장(바꾸고 0.3초 뒤, 종료할 때). 다음 실행은 저장된 값으로 시작. 맥마다 따로이고, `.app`(com.artbrain.noch)과 `swift build` 실행 파일도 따로.
+
+**메뉴 막대 앱 (2026-10-30)**: 독 아이콘 없음(`.accessory`, Info.plist `LSUIElement`). 메뉴 막대 아이콘(`Resources/menubarIcon.png`, 템플릿 이미지 16pt) 메뉴에 설정…(⌘,)·종료(⌘Q). 앱 아이콘은 `Resources/AppIcon.png` → `build-app.sh`가 icns로.
 
 ---
 

@@ -9,7 +9,10 @@ import SwiftUI
 // 팝업 안에는 위에서 내려오는 검정을 유리 "아래"에 깐다. 검정은 팝업 모양을 따라 휘며 사라지고,
 // 유리가 그 위에서 굴절·반사해서 검정 부분도 액체 유리처럼 보인다.
 
-/// 모든 조절 값. 기본값은 2026-10-30 사용자가 맞춘 2차 설정.
+import Combine
+
+/// 모든 조절 값. 기본값은 2026-10-30 사용자가 맞춘 3차 설정.
+/// 바꾼 값은 UserDefaults에 저장해서 앱을 다시 켜도 이어진다.
 final class DropTuning: ObservableObject {
     // 노치 확장
     @Published var growWidth: CGFloat = 100
@@ -32,9 +35,10 @@ final class DropTuning: ObservableObject {
     // 검정 덮개: 팝업 모양을 위로 끌어올려 흐리게 만든 검정. 흐린 경계가 모서리 곡선을 따라 휜다.
     @Published var lift: CGFloat = 35.5              // 검정 아래 끝을 팝업 아래 끝보다 얼마나 위로
     @Published var softness: CGFloat = 22.5          // 흐림 = 검정이 사라지는 구간 길이
-    @Published var blackRadius: CGFloat = 74.5       // 검정 모양의 아래 모서리 반지름(휘어짐 정도)
-    @Published var sideInset: CGFloat = -30          // 양옆에서 들임. 키우면 옆 가장자리에 유리가 더 드러남
+    @Published var blackRadius: CGFloat = 60         // 검정 모양의 아래 모서리 반지름(휘어짐 정도)
+    @Published var sideInset: CGFloat = -10          // 양옆에서 들임. 키우면 옆 가장자리에 유리가 더 드러남
     @Published var blackOpacity: CGFloat = 1
+    @Published var overBlack: CGFloat = 0.5          // 같은 검정 모양을 유리 "위"에도 이만큼 덧칠. 유리가 검정을 밝혀 보이게 하는 만큼 다시 어둡게
     // 덧그린 테두리 빛
     @Published var rimOpacity: CGFloat = 0.05        // 유리 자체 테두리 위에 아주 살짝
     @Published var rimWidth: CGFloat = 1
@@ -63,15 +67,61 @@ final class DropTuning: ObservableObject {
     /// 바뀔 때마다 패널이 열기/닫기 모션을 한다. 마우스 위치(SiriDemo)나 설정창 버튼이 바꾼다.
     @Published var isOpen = false
 
-    /// 2차 설정(= 기본값): 2026-10-30 회사 맥에서 사용자가 맞춘 값. 조절하다가 이 값으로 되돌릴 때 쓴다.
-    func applySecondPreset() {
+    /// 3차 설정(= 기본값): 2026-10-30 회사 맥에서 사용자가 맞춘 값. 조절하다가 이 값으로 되돌릴 때 쓴다.
+    func applyThirdPreset() {
         growWidth = 100; growHeight = 8; grownBottomRadius = 26; grownTopRadius = 12; popupHeight = 204
         popupRadius = 26; gap = 11; spacing = 16; grainHeight = 34; waitInset = 4
         inkDelay = 0; inkDuration = 0.65; inkNeck = true; clearGlass = true; tintOpacity = 0
-        lift = 35.5; softness = 22.5; blackRadius = 74.5; sideInset = -30; blackOpacity = 1
+        lift = 35.5; softness = 22.5; blackRadius = 60; sideInset = -10; blackOpacity = 1; overBlack = 0.5
         rimOpacity = 0.05; rimWidth = 1; rimSoftness = 1.5; shadowOpacity = 0.3; shadowRadius = 28
         shadowY = 14.5; textSize = 15; textPadding = 22; textTop = 18; growDuration = 0.6
         growBounce = 0.2; dropDelay = -0.7; dropDuration = 0.75; dropBounce = 0.4; closeSpeed = 0.5
+    }
+
+    // MARK: 저장
+
+    /// 저장·출력하는 값 목록. 새 조절 값을 만들면 여기에도 넣는다(isOpen 같은 상태는 빼고).
+    private static let numbers: [(String, ReferenceWritableKeyPath<DropTuning, CGFloat>)] = [
+        ("growWidth", \.growWidth), ("growHeight", \.growHeight),
+        ("grownBottomRadius", \.grownBottomRadius), ("grownTopRadius", \.grownTopRadius),
+        ("popupHeight", \.popupHeight), ("popupRadius", \.popupRadius), ("gap", \.gap), ("spacing", \.spacing),
+        ("grainHeight", \.grainHeight), ("waitInset", \.waitInset),
+        ("inkDelay", \.inkDelay), ("inkDuration", \.inkDuration), ("tintOpacity", \.tintOpacity),
+        ("lift", \.lift), ("softness", \.softness), ("blackRadius", \.blackRadius),
+        ("sideInset", \.sideInset), ("blackOpacity", \.blackOpacity), ("overBlack", \.overBlack),
+        ("rimOpacity", \.rimOpacity), ("rimWidth", \.rimWidth), ("rimSoftness", \.rimSoftness),
+        ("shadowOpacity", \.shadowOpacity), ("shadowRadius", \.shadowRadius), ("shadowY", \.shadowY),
+        ("textSize", \.textSize), ("textPadding", \.textPadding), ("textTop", \.textTop),
+        ("growDuration", \.growDuration), ("growBounce", \.growBounce), ("dropDelay", \.dropDelay),
+        ("dropDuration", \.dropDuration), ("dropBounce", \.dropBounce), ("closeSpeed", \.closeSpeed),
+        ("hoverMargin", \.hoverMargin), ("keepMargin", \.keepMargin),
+    ]
+    private static let flags: [(String, ReferenceWritableKeyPath<DropTuning, Bool>)] = [
+        ("inkNeck", \.inkNeck), ("clearGlass", \.clearGlass), ("holdWhileSettings", \.holdWhileSettings),
+    ]
+    private static let defaultsKey = "dropTuning"
+    private var saving: AnyCancellable?
+
+    init() {
+        if let saved = UserDefaults.standard.dictionary(forKey: Self.defaultsKey) {
+            for (key, path) in Self.numbers {
+                if let value = saved[key] as? Double { self[keyPath: path] = CGFloat(value) }
+            }
+            for (key, path) in Self.flags {
+                if let value = saved[key] as? Bool { self[keyPath: path] = value }
+            }
+        }
+        // 슬라이더를 끄는 동안 매번 쓰지 않도록, 손을 멈추고 0.3초 뒤에 저장
+        saving = objectWillChange
+            .debounce(for: .seconds(0.3), scheduler: RunLoop.main)
+            .sink { [weak self] _ in self?.save() }
+    }
+
+    func save() {
+        var dict: [String: Any] = [:]
+        for (key, path) in Self.numbers { dict[key] = Double(self[keyPath: path]) }
+        for (key, path) in Self.flags { dict[key] = self[keyPath: path] }
+        UserDefaults.standard.set(dict, forKey: Self.defaultsKey)
     }
 
     /// 열림 시간표(초). 스프링 길이는 눈에 보이게 움직이는 데까지(visibleDuration)로 잡는다.
@@ -86,23 +136,9 @@ final class DropTuning: ObservableObject {
     }
 
     var summary: String {
-        let pairs: [(String, CGFloat)] = [
-            ("growWidth", growWidth), ("growHeight", growHeight),
-            ("grownBottomRadius", grownBottomRadius), ("grownTopRadius", grownTopRadius),
-            ("popupHeight", popupHeight), ("popupRadius", popupRadius), ("gap", gap), ("spacing", spacing),
-            ("grainHeight", grainHeight), ("waitInset", waitInset), ("inkDelay", inkDelay), ("inkDuration", inkDuration),
-            ("inkNeck", inkNeck ? 1 : 0),
-            ("clearGlass", clearGlass ? 1 : 0), ("tintOpacity", tintOpacity),
-            ("lift", lift), ("softness", softness), ("blackRadius", blackRadius),
-            ("sideInset", sideInset), ("blackOpacity", blackOpacity),
-            ("rimOpacity", rimOpacity), ("rimWidth", rimWidth), ("rimSoftness", rimSoftness),
-            ("shadowOpacity", shadowOpacity), ("shadowRadius", shadowRadius), ("shadowY", shadowY),
-            ("textSize", textSize), ("textPadding", textPadding), ("textTop", textTop),
-            ("growDuration", growDuration), ("growBounce", growBounce), ("dropDelay", dropDelay),
-            ("dropDuration", dropDuration), ("dropBounce", dropBounce), ("closeSpeed", closeSpeed),
-            ("hoverMargin", hoverMargin), ("keepMargin", keepMargin),
-        ]
-        return pairs.map { String(format: "%@=%g", $0.0, Double($0.1)) }.joined(separator: " ")
+        let numbers = Self.numbers.map { String(format: "%@=%g", $0.0, Double(self[keyPath: $0.1])) }
+        let flags = Self.flags.map { "\($0.0)=\(self[keyPath: $0.1] ? 1 : 0)" }
+        return (numbers + flags).joined(separator: " ")
     }
 }
 
@@ -188,6 +224,7 @@ struct DropPanelView: View {
     private var popupLayers: some View {
         ZStack(alignment: .top) {
             blackCover
+                .opacity(tuning.blackOpacity)
                 .frame(width: popupSize.width, height: popupSize.height, alignment: .topLeading)
                 .clipShape(popupShape)
                 .offset(y: popupTop)
@@ -205,6 +242,14 @@ struct DropPanelView: View {
                 }
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
             }
+
+            // 덧칠: 유리 아래 검정만으로는 유리가 빛을 더해 덜 검게 보인다. 같은 모양을 유리 위에 반투명으로 한 번 더.
+            // 위에 덮는 만큼 유리 질감도 가려지므로 불투명도로 맞춘다(1이면 처음의 매트한 평면과 같아짐).
+            blackCover
+                .opacity(tuning.overBlack)
+                .frame(width: popupSize.width, height: popupSize.height, alignment: .topLeading)
+                .clipShape(popupShape)
+                .offset(y: popupTop)
 
             // 검정 방울: 노치와 같은 검정으로 덮었다가 떨어지면서 걷혀 유리가 드러난다.
             popupShape.fill(.black)
@@ -239,7 +284,6 @@ struct DropPanelView: View {
             .frame(width: max(0, popupSize.width - tuning.sideInset * 2), height: height)
             .offset(x: tuning.sideInset, y: -extraTop)
             .blur(radius: tuning.softness)
-            .opacity(tuning.blackOpacity)
     }
 
     /// 유리 가장자리 빛. 위는 밝게, 옆은 거의 없게, 아래는 다시 살짝 — 빛이 위에서 비치는 유리처럼.
@@ -359,7 +403,7 @@ struct DropControlView: View {
                 Button("닫기") { tuning.isOpen = false }
                 Button("다시 재생") { replay() }
                 Spacer()
-                Button("2차설정") { tuning.applySecondPreset(); replay() }
+                Button("3차설정") { tuning.applyThirdPreset(); replay() }
                 Button("종료") { NSApp.terminate(nil) }
             }
             .padding(16)
@@ -417,6 +461,7 @@ struct DropControlView: View {
                     sliderRow("검정 모서리 반지름", $tuning.blackRadius, 0...80)
                     sliderRow("양옆 들임", $tuning.sideInset, -30...60)
                     sliderRow("불투명도", $tuning.blackOpacity, 0...1, step: 0.05)
+                    sliderRow("유리 위 덧칠", $tuning.overBlack, 0...1, step: 0.05)
 
                     section("바깥 그림자")
                     sliderRow("진하기", $tuning.shadowOpacity, 0...1, step: 0.05)
@@ -496,8 +541,9 @@ struct DropControlView: View {
 
 @available(macOS 26.0, *)
 @MainActor
-final class SiriDemo {
+final class SiriDemo: NSObject {
     private var panel: NotchPanel?
+    private var statusItem: NSStatusItem?
     private var controlWindow: NSWindow?
     private var metrics: NotchMetrics?
     private var mouseTimer: Timer?
@@ -532,6 +578,41 @@ final class SiriDemo {
         }
         RunLoop.main.add(timer, forMode: .common)
         mouseTimer = timer
+
+        setUpStatusItem()
+    }
+
+    /// 메뉴 막대 아이콘과 메뉴(설정, 종료)
+    private func setUpStatusItem() {
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        if let image = Self.menuBarIcon() {
+            image.isTemplate = true   // 회색 단색 그림이라 메뉴 막대 밝기에 맞춰 칠하게
+            image.size = NSSize(width: 16, height: 16)
+            item.button?.image = image
+        } else {
+            item.button?.title = "36"
+        }
+        let menu = NSMenu()
+        let settings = NSMenuItem(title: "설정…", action: #selector(menuSettings), keyEquivalent: ",")
+        settings.target = self
+        menu.addItem(settings)
+        menu.addItem(.separator())
+        let quit = NSMenuItem(title: "36NOCH 종료", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+        menu.addItem(quit)
+        item.menu = menu
+        statusItem = item
+    }
+
+    @objc private func menuSettings() { toggleSettings() }
+
+    /// .app 번들 안(Contents/Resources)에서 찾고, `swift build`로 띄운 경우엔 저장소의 Resources에서 찾는다.
+    private static func menuBarIcon() -> NSImage? {
+        if let url = Bundle.main.url(forResource: "menubarIcon", withExtension: "png") {
+            return NSImage(contentsOf: url)
+        }
+        let repo = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
+        return NSImage(contentsOf: repo.appendingPathComponent("Resources/menubarIcon.png"))
     }
 
     private func toggleSettings() {
@@ -551,10 +632,12 @@ final class SiriDemo {
         let sf = metrics.screen.frame
         let t = tuning
 
+        // 설정창이 떠 있으면 펼친 채 유지. 설정창을 닫으면 다음 확인(1/60초 뒤)에 바로 아래 규칙으로 돌아가서,
+        // 마우스가 노치+팝업 위에 없으면 곧장 닫힌다.
         let holding = t.holdWhileSettings && (controlWindow?.isVisible ?? false)
         if !holding {
             if t.isOpen {
-                if !keepRect(screen: sf, metrics: metrics).contains(mouse) { t.isOpen = false }
+                if !keepRect(screen: sf, metrics: metrics, margin: t.keepMargin).contains(mouse) { t.isOpen = false }
             } else {
                 let notch = CGRect(x: sf.midX - metrics.width / 2, y: sf.maxY - metrics.height,
                                    width: metrics.width, height: metrics.height)
@@ -562,21 +645,24 @@ final class SiriDemo {
                 if notch.insetBy(dx: -t.hoverMargin, dy: -t.hoverMargin).contains(mouse) { t.isOpen = true }
             }
         }
-        // 열려 있을 때만 클릭을 받는다(설정 아이콘). 닫혀 있을 때는 아래 앱으로 통과.
-        panel.ignoresMouseEvents = !t.isOpen
+        // 열려 있고 마우스가 노치+팝업 위에 있을 때만 클릭을 받는다(설정 아이콘).
+        // 패널 창은 1000×620으로 커서, 창 전체가 클릭을 받으면 겹친 설정창의 제목 막대·버튼 클릭까지 가로챈다.
+        let overContent = keepRect(screen: sf, metrics: metrics, margin: 0).contains(mouse)
+        panel.ignoresMouseEvents = !(t.isOpen && overContent)
     }
 
-    /// 커진 노치와 팝업(간격 포함)을 감싸는 사각형, 화면 좌표
-    private func keepRect(screen sf: CGRect, metrics: NotchMetrics) -> CGRect {
+    /// 커진 노치와 팝업(간격 포함)을 감싸는 사각형에 여백을 더한 것, 화면 좌표
+    private func keepRect(screen sf: CGRect, metrics: NotchMetrics, margin: CGFloat) -> CGRect {
         let t = tuning
         let width = metrics.width + t.growWidth
         let height = metrics.height + t.growHeight + t.gap + t.popupHeight
         return CGRect(x: sf.midX - width / 2, y: sf.maxY - height, width: width, height: height)
-            .insetBy(dx: -t.keepMargin, dy: -t.keepMargin)
+            .insetBy(dx: -margin, dy: -margin)
     }
 
     func stop() {
         mouseTimer?.invalidate()
+        tuning.save()
         print(tuning.summary)
     }
 }
