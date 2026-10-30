@@ -145,23 +145,24 @@ func countdownText(to date: Date, now: Date) -> String {
     return "\(total / 86400) days"
 }
 
-/// 퇴근 알림: 평일(월~금) 18:00:00부터 10초간 팝업을 열어 지금 시각을 보여 준다.
+/// 퇴근 알림: 평일(월~금) 18:00:00부터 10초간 팝업을 열어 "18:00"을 깜빡인다.
 enum GoHome {
     static let hour = 18
     static let seconds = 10
 
+    /// 시험용: `--test-gohome` 인자로 띄우면 실행 3초 뒤에 한 번 보여 준다(open build/36NOCH.app --args --test-gohome)
+    static let testStart: Date? = CommandLine.arguments.contains("--test-gohome") ? Date().addingTimeInterval(3) : nil
+
     /// 평일 18:00:00부터 seconds초 안인지
     static func isTime(_ date: Date, seconds: Int) -> Bool {
+        if let t = testStart, date >= t, date < t.addingTimeInterval(Double(seconds)) { return true }
         let c = Foundation.Calendar.current.dateComponents([.weekday, .hour, .minute, .second], from: date)
         guard let weekday = c.weekday, (2...6).contains(weekday) else { return false }  // 1 = 일요일
         return c.hour == hour && c.minute == 0 && (c.second ?? 99) < seconds
     }
 
-    static func clock(_ date: Date) -> String {
-        let f = DateFormatter()
-        f.dateFormat = "HH:mm:ss"
-        return f.string(from: date)
-    }
+    /// 시계 자리 글: "18:00"
+    static var clock: String { String(format: "%02d:00", hour) }
 
     /// 오른쪽 두 줄: 오늘 날짜와 18:00
     static func when(_ date: Date) -> (day: String, time: String) {

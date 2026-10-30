@@ -78,7 +78,7 @@ final class DropTuning: ObservableObject {
 
     // 마우스
     @Published var hoverMargin: CGFloat = 40         // 실제 노치 좌우·위 이만큼 안에 마우스가 오면 연다
-    @Published var hoverDown: CGFloat = 32           // 실제 노치 아래로는 이만큼까지
+    @Published var hoverDown: CGFloat = 16           // 실제 노치 아래로는 이만큼까지
     @Published var keepMargin: CGFloat = 8           // 커진 노치+팝업 둘레 이만큼 밖으로 나가면 닫는다
     @Published var holdWhileSettings = true          // 설정창이 떠 있는 동안은 마우스와 상관없이 펼친 채 유지
 
@@ -317,8 +317,10 @@ struct DropPanelView: View {
                     let home = GoHome.isTime(now, seconds: GoHome.seconds + 2)
                     HStack(alignment: .top) {
                         if home {
-                            // 평일 18시: 지금 시각을 하늘색으로
-                            clockColumn(text: GoHome.clock(now), title: "Go home Now!", color: (0x87 / 255, 0xce / 255, 0xeb / 255))  // skyblue #87ceeb
+                            // 평일 18시: "18:00"을 하늘색으로, 열려 있는 10초 동안 회의 시작 00:00처럼 깜빡인다
+                            let blinking = GoHome.isTime(now, seconds: GoHome.seconds)
+                            clockColumn(text: GoHome.clock, title: "Go home Now!", color: (0x87 / 255, 0xce / 255, 0xeb / 255),  // skyblue #87ceeb
+                                        clockVisible: !blinking || Int(now.timeIntervalSinceReferenceDate * 2) % 2 == 0)
                         } else if let next = calendar.next {
                             // 임시: 다음 회의까지 남은 시간. 알림으로 열려 있는 동안만 붉게:
                             // 10분 전 10초간, 5분 전부터 시작 뒤 00:00을 깜빡이는 10초까지
