@@ -141,11 +141,11 @@ extension CalendarFeed {
     }
 }
 
-/// 남은 시간. 1시간 미만 "MM:SS", 100시간 미만 "H:MM:SS"·"HH:MM:SS"(날로 나누지 않음), 그 이상 "4 days".
+/// 남은 시간. 되도록 네 자리로: 1시간 미만 "MM:SS", 100시간 미만 "HH:MM"(초는 버림, 날로 나누지 않음), 그 이상 "4 days".
 func countdownText(to date: Date, now: Date) -> String {
     let total = max(0, Int(date.timeIntervalSince(now)))
     if total < 3600 { return String(format: "%02d:%02d", total / 60, total % 60) }
-    if total < 100 * 3600 { return String(format: "%d:%02d:%02d", total / 3600, total % 3600 / 60, total % 60) }
+    if total < 100 * 3600 { return String(format: "%02d:%02d", total / 3600, total % 3600 / 60) }
     return "\(total / 86400) days"
 }
 

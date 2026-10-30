@@ -342,6 +342,7 @@ struct DropPanelView: View {
                             let blinking = left <= 0 && left > -CalendarFeed.blink
                             clockColumn(text: countdownText(to: next.start, now: now), title: calendar.summary,
                                         color: alert ? (1, 0x3b / 255, 0x30 / 255)  // #ff3b30
+                                             : left >= 3600 ? (0x68 / 255, 0x6b / 255, 0x88 / 255)  // 1시간 이상(HH:MM) #686B88
                                                      : (1, 0xd7 / 255, 0),  // Gold #ffd700
                                         clockVisible: !blinking || Int(now.timeIntervalSinceReferenceDate * 2) % 2 == 0,
                                         onTitle: openCalendarApp)
