@@ -11,16 +11,18 @@ import SwiftUI
 
 import Combine
 
-/// 모든 조절 값. 기본값은 2026-10-30 사용자가 맞춘 3차 설정.
+/// 모든 조절 값. 기본값은 2026-10-30 사용자가 맞춘 3차 설정(+ 하단 영역).
 /// 바꾼 값은 UserDefaults에 저장해서 앱을 다시 켜도 이어진다.
 final class DropTuning: ObservableObject {
     // 노치 확장
     @Published var growWidth: CGFloat = 100
     @Published var growHeight: CGFloat = 8
+    @Published var restWide = true                  // 닫혀 있을 때도 노치 검정을 좌우로 늘여 둔다
+    @Published var restWidth: CGFloat = 48           // 그때 늘이는 너비(양쪽 합, 한쪽 24)
     @Published var grownBottomRadius: CGFloat = 26   // 커진 노치 아래 모서리(볼록). 원래 노치 10
     @Published var grownTopRadius: CGFloat = 12      // 커진 노치 위 모서리(오목). 원래 노치 6
     // 팝업 방울
-    @Published var popupHeight: CGFloat = 204
+    @Published var popupHeight: CGFloat = 220
     @Published var popupRadius: CGFloat = 26
     @Published var gap: CGFloat = 11                 // 커진 노치 아래 끝과 팝업 위 끝 사이
     @Published var spacing: CGFloat = 16             // GlassEffectContainer가 두 유리를 붙이는 거리
@@ -39,6 +41,16 @@ final class DropTuning: ObservableObject {
     @Published var sideInset: CGFloat = -10          // 양옆에서 들임. 키우면 옆 가장자리에 유리가 더 드러남
     @Published var blackOpacity: CGFloat = 1
     @Published var overBlack: CGFloat = 0.5          // 같은 검정 모양을 유리 "위"에도 이만큼 덧칠. 유리가 검정을 밝혀 보이게 하는 만큼 다시 어둡게
+    // 하단 영역: 팝업 아래쪽 안에 둔 흰 반투명 면. 이 안에는 검정이 들어오지 않는다.
+    @Published var trayHeight: CGFloat = 60
+    @Published var trayMargin: CGFloat = 20          // 좌우·아래 여백
+    @Published var trayOpacity: CGFloat = 0.1        // 흰색 불투명도
+    @Published var trayConcentric = true             // 켜면 모서리 = 팝업 모서리 − 여백(같은 중심의 곡선), 끄면 팝업과 같은 반지름
+    @Published var trayRadiusPlus: CGFloat = 4       // 위 규칙으로 정한 모서리에 더하는 값
+    @Published var trayCapsule = true                // 켜면 좌우가 완전한 반원(위 두 규칙 무시)
+    @Published var popupBottomConcentric = true      // 켜면 팝업 아래 두 모서리 = 하단 영역 모서리 + 여백(같은 중심의 곡선)
+    @Published var trayDelay: CGFloat = -0.2         // 팝업 등장이 끝나고 이만큼 뒤에 나타난다(초). 음수면 끝나기 전
+    @Published var trayFade: CGFloat = 0.3           // 나타나고 사라지는 시간(초). 닫을 때는 닫힘 시작과 함께 사라진다
     // 덧그린 테두리 빛
     @Published var rimOpacity: CGFloat = 0.05        // 유리 자체 테두리 위에 아주 살짝
     @Published var rimWidth: CGFloat = 1
@@ -47,10 +59,15 @@ final class DropTuning: ObservableObject {
     @Published var shadowOpacity: CGFloat = 0.3
     @Published var shadowRadius: CGFloat = 28
     @Published var shadowY: CGFloat = 14.5
-    // 글
-    @Published var textSize: CGFloat = 15
-    @Published var textPadding: CGFloat = 22
-    @Published var textTop: CGFloat = 18
+    // 글: 확정한 값이라 설정창·저장에서 뺐다(2026-10-30)
+    let textSize: CGFloat = 11
+    let textPadding: CGFloat = 22
+    let textTop: CGFloat = 18
+    // 다음 회의까지 남은 시간(Distro Mix, 금색). 너비를 고정하고, 글자 수가 줄면 그만큼 글자가 커져 아래로 늘어난다.
+    let countdownWidth: CGFloat = 204     // 시계 너비. 204면 8자리(70:02:31)가 약 49pt
+    let countdownGap: CGFloat = 12        // 숫자 아래 끝 ~ 제목 글자 위 끝
+    let countdownX: CGFloat = -4          // 남은 시간만 좌우로 옮기는 양(음수 = 왼쪽)
+    let countdownLift: CGFloat = 0        // 더 끌어올리는 양. 0이면 숫자 위 끝 = 날짜 글자 위 끝
     // 모션(초)
     @Published var growDuration: CGFloat = 0.6
     @Published var growBounce: CGFloat = 0.2
@@ -60,7 +77,8 @@ final class DropTuning: ObservableObject {
     @Published var closeSpeed: CGFloat = 0.5         // 닫힘은 열림의 정확한 역재생. 이 값은 시간 배율(1 = 열 때와 같은 속도, 작을수록 빠름)
 
     // 마우스
-    @Published var hoverMargin: CGFloat = 40         // 실제 노치 둘레 이만큼 안에 마우스가 오면 연다
+    @Published var hoverMargin: CGFloat = 40         // 실제 노치 좌우·위 이만큼 안에 마우스가 오면 연다
+    @Published var hoverDown: CGFloat = 32           // 실제 노치 아래로는 이만큼까지
     @Published var keepMargin: CGFloat = 8           // 커진 노치+팝업 둘레 이만큼 밖으로 나가면 닫는다
     @Published var holdWhileSettings = true          // 설정창이 떠 있는 동안은 마우스와 상관없이 펼친 채 유지
 
@@ -69,12 +87,14 @@ final class DropTuning: ObservableObject {
 
     /// 3차 설정(= 기본값): 2026-10-30 회사 맥에서 사용자가 맞춘 값. 조절하다가 이 값으로 되돌릴 때 쓴다.
     func applyThirdPreset() {
-        growWidth = 100; growHeight = 8; grownBottomRadius = 26; grownTopRadius = 12; popupHeight = 204
+        growWidth = 100; growHeight = 8; restWide = true; restWidth = 48; grownBottomRadius = 26; grownTopRadius = 12; popupHeight = 220
         popupRadius = 26; gap = 11; spacing = 16; grainHeight = 34; waitInset = 4
         inkDelay = 0; inkDuration = 0.65; inkNeck = true; clearGlass = true; tintOpacity = 0
         lift = 35.5; softness = 22.5; blackRadius = 60; sideInset = -10; blackOpacity = 1; overBlack = 0.5
+        trayHeight = 60; trayMargin = 20; trayOpacity = 0.1; trayConcentric = true
+        trayRadiusPlus = 4; trayDelay = -0.2; trayFade = 0.3; trayCapsule = true; popupBottomConcentric = true
         rimOpacity = 0.05; rimWidth = 1; rimSoftness = 1.5; shadowOpacity = 0.3; shadowRadius = 28
-        shadowY = 14.5; textSize = 15; textPadding = 22; textTop = 18; growDuration = 0.6
+        shadowY = 14.5; growDuration = 0.6
         growBounce = 0.2; dropDelay = -0.7; dropDuration = 0.75; dropBounce = 0.4; closeSpeed = 0.5
     }
 
@@ -89,15 +109,18 @@ final class DropTuning: ObservableObject {
         ("inkDelay", \.inkDelay), ("inkDuration", \.inkDuration), ("tintOpacity", \.tintOpacity),
         ("lift", \.lift), ("softness", \.softness), ("blackRadius", \.blackRadius),
         ("sideInset", \.sideInset), ("blackOpacity", \.blackOpacity), ("overBlack", \.overBlack),
+        ("trayHeight", \.trayHeight), ("trayMargin", \.trayMargin), ("trayOpacity", \.trayOpacity),
+        ("trayRadiusPlus", \.trayRadiusPlus), ("trayDelay", \.trayDelay), ("trayFade", \.trayFade),
         ("rimOpacity", \.rimOpacity), ("rimWidth", \.rimWidth), ("rimSoftness", \.rimSoftness),
         ("shadowOpacity", \.shadowOpacity), ("shadowRadius", \.shadowRadius), ("shadowY", \.shadowY),
-        ("textSize", \.textSize), ("textPadding", \.textPadding), ("textTop", \.textTop),
         ("growDuration", \.growDuration), ("growBounce", \.growBounce), ("dropDelay", \.dropDelay),
         ("dropDuration", \.dropDuration), ("dropBounce", \.dropBounce), ("closeSpeed", \.closeSpeed),
-        ("hoverMargin", \.hoverMargin), ("keepMargin", \.keepMargin),
+        ("restWidth", \.restWidth), ("hoverMargin", \.hoverMargin), ("hoverDown", \.hoverDown), ("keepMargin", \.keepMargin),
     ]
     private static let flags: [(String, ReferenceWritableKeyPath<DropTuning, Bool>)] = [
-        ("inkNeck", \.inkNeck), ("clearGlass", \.clearGlass), ("holdWhileSettings", \.holdWhileSettings),
+        ("inkNeck", \.inkNeck), ("restWide", \.restWide), ("clearGlass", \.clearGlass), ("holdWhileSettings", \.holdWhileSettings),
+        ("trayConcentric", \.trayConcentric), ("trayCapsule", \.trayCapsule),
+        ("popupBottomConcentric", \.popupBottomConcentric),
     ]
     private static let defaultsKey = "dropTuning"
     private var saving: AnyCancellable?
@@ -147,14 +170,19 @@ struct DropPanelView: View {
     let metrics: NotchMetrics
     let onSettings: () -> Void
     @ObservedObject var tuning: DropTuning
+    @ObservedObject var calendar: CalendarFeed
 
     // 모션 단계: 노치가 커졌는지, 방울이 떨어졌는지
     @State private var grown = false
     @State private var dropped = false
     @State private var inked = true       // 팝업이 온통 검정인지. 노치 밑에서 기다릴 때와 떨어지기 시작할 때는 검정 방울
+    @State private var trayShown = false  // 하단 영역. 팝업 등장이 끝난 뒤에 나타난다
     @State private var sequence: Task<Void, Never>?
 
-    private var notchWidth: CGFloat { metrics.width + (grown ? tuning.growWidth : 0) }
+    // 닫혀 있을 때도 너비를 restWidth만큼 늘여 둘 수 있다(restWide).
+    private var notchWidth: CGFloat {
+        metrics.width + (grown ? tuning.growWidth : tuning.restWide ? tuning.restWidth : 0)
+    }
     private var notchHeight: CGFloat { metrics.height + (grown ? tuning.growHeight : 0) }
 
     // 노치가 커질 때 모서리도 함께 커진다(NotchShape가 반지름까지 애니메이션).
@@ -181,8 +209,21 @@ struct DropPanelView: View {
         return tuning.tintOpacity > 0 ? base.tint(.black.opacity(tuning.tintOpacity)) : base
     }
 
-    private var popupShape: RoundedRectangle {
-        RoundedRectangle(cornerRadius: min(tuning.popupRadius, popupSize.height / 2, popupSize.width / 2))
+    /// 위 두 모서리는 팝업 반지름, 아래 두 모서리는 켜 두면 하단 영역 곡선과 같은 중심이 되게 한다.
+    private var popupShape: UnevenRoundedRectangle {
+        let limit = min(popupSize.height / 2, popupSize.width / 2)
+        let top = min(tuning.popupRadius, limit)
+        let bottom = tuning.popupBottomConcentric ? min(trayRadius + tuning.trayMargin, limit) : top
+        return UnevenRoundedRectangle(topLeadingRadius: top, bottomLeadingRadius: bottom,
+                                      bottomTrailingRadius: bottom, topTrailingRadius: top)
+    }
+
+    /// 하단 영역 모서리 반지름. 팝업의 위 모서리 기준으로 정해서, 팝업 아래 모서리와 서로 물고 돌지 않게 한다.
+    private var trayRadius: CGFloat {
+        if tuning.trayCapsule { return tuning.trayHeight / 2 }
+        let outer = min(tuning.popupRadius, popupSize.height / 2, popupSize.width / 2)
+        let base = tuning.trayConcentric ? max(0, outer - tuning.trayMargin) : outer
+        return max(0, min(base + tuning.trayRadiusPlus, tuning.trayHeight / 2))
     }
 
     var body: some View {
@@ -196,10 +237,14 @@ struct DropPanelView: View {
             // 커진 노치는 하드웨어 노치와 같은 검정
             notchShape.fill(.black)
 
+            restDots
             settingsButton
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .onChange(of: tuning.isOpen) { _, open in play(open: open) }
+        .onChange(of: tuning.isOpen) { _, open in
+            if open { calendar.reload() }
+            play(open: open)
+        }
     }
 
     /// 설정 아이콘. 노치가 커지며 생긴 오른쪽 검정 영역(하드웨어 노치 오른쪽 끝 ~ 커진 노치 오른쪽 끝)의 한가운데.
@@ -220,14 +265,24 @@ struct DropPanelView: View {
         .allowsHitTesting(grown)
     }
 
+    /// 닫혀 있을 때: 실제(하드웨어) 노치 좌우 끝에 바짝 붙인 6pt 회색 원 두 개, 높이 가운데.
+    /// 넓혀 둔 검정(restWidth) 위에 놓인다. 열리면 사라진다.
+    private var restDots: some View {
+        let d: CGFloat = 6
+        let x = metrics.width / 2 + d / 2
+        let dot = Circle().fill(Color(red: 0x66 / 255, green: 0x66 / 255, blue: 0x66 / 255)).frame(width: d, height: d)
+        return ZStack {
+            dot.offset(x: -x)
+            dot.offset(x: x)
+        }
+        .offset(y: metrics.height / 2 - d / 2)
+        .opacity(grown ? 0 : 1)
+    }
+
     /// 팝업과 그 유리 컨테이너. 검정 덮개 → 유리 → 글 순으로 쌓는다.
     private var popupLayers: some View {
         ZStack(alignment: .top) {
-            blackCover
-                .opacity(tuning.blackOpacity)
-                .frame(width: popupSize.width, height: popupSize.height, alignment: .topLeading)
-                .clipShape(popupShape)
-                .offset(y: popupTop)
+            popupBlack(opacity: tuning.blackOpacity)
 
             GlassEffectContainer(spacing: tuning.spacing) {
                 ZStack(alignment: .top) {
@@ -245,11 +300,7 @@ struct DropPanelView: View {
 
             // 덧칠: 유리 아래 검정만으로는 유리가 빛을 더해 덜 검게 보인다. 같은 모양을 유리 위에 반투명으로 한 번 더.
             // 위에 덮는 만큼 유리 질감도 가려지므로 불투명도로 맞춘다(1이면 처음의 매트한 평면과 같아짐).
-            blackCover
-                .opacity(tuning.overBlack)
-                .frame(width: popupSize.width, height: popupSize.height, alignment: .topLeading)
-                .clipShape(popupShape)
-                .offset(y: popupTop)
+            popupBlack(opacity: tuning.overBlack)
 
             // 검정 방울: 노치와 같은 검정으로 덮었다가 떨어지면서 걷혀 유리가 드러난다.
             popupShape.fill(.black)
@@ -257,12 +308,44 @@ struct DropPanelView: View {
                 .offset(y: popupTop)
                 .opacity(inked ? 1 : 0)
 
-            // 유리 위에 얹는 것: 테두리 빛, 글
+            // 유리 위에 얹는 것: 하단 영역, 테두리 빛, 글
             ZStack(alignment: .topLeading) {
+                tray(Color.white.opacity(tuning.trayOpacity))
+                    .opacity(trayShown ? 1 : 0)
                 rim
-                Text("11월에 있는 토요일 중에 오후 12시부터 3시 사이에 간식을 가져갈 수 있는 날들 정리해서 이메일 초안 작성해 줘.")
-                    .font(.system(size: tuning.textSize, weight: .medium))
-                    .foregroundStyle(.white)
+                // 왼쪽: 남은 시간(금색) 아래에 회의 제목(어두운 금색). 오른쪽: 날짜·시각 두 줄.
+                // 0.5초마다 다시 그린다(남은 시간, 퇴근 알림, 00:00 깜빡임).
+                TimelineView(.periodic(from: .now, by: 0.5)) { context in
+                    let now = context.date
+                    // 퇴근 알림은 닫힘 모션이 끝날 때까지(10초 + 2초) 그대로 보여 준다
+                    let home = GoHome.isTime(now, seconds: GoHome.seconds + 2)
+                    HStack(alignment: .top) {
+                        if home {
+                            // 평일 18시: 지금 시각을 하늘색으로
+                            clockColumn(text: GoHome.clock(now), title: "Go home Now!", color: (0x87 / 255, 0xce / 255, 0xeb / 255))  // skyblue #87ceeb
+                        } else if let next = calendar.next {
+                            // 임시: 다음 회의까지 남은 시간. 알림으로 열려 있는 동안만 붉게:
+                            // 10분 전 10초간, 5분 전부터 시작 뒤 00:00을 깜빡이는 10초까지
+                            let left = next.start.timeIntervalSince(now)
+                            let alert = left <= 5 * 60 || (left > 10 * 60 - 10 && left <= 10 * 60)
+                            let blinking = left <= 0 && left > -CalendarFeed.blink
+                            clockColumn(text: countdownText(to: next.start, now: now), title: calendar.summary,
+                                        color: alert ? (1, 0x3b / 255, 0x30 / 255)  // #ff3b30
+                                                     : (1, 0xd7 / 255, 0),  // Gold #ffd700
+                                        clockVisible: !blinking || Int(now.timeIntervalSinceReferenceDate * 2) % 2 == 0)
+                        } else {
+                            Text(calendar.summary)
+                                .foregroundStyle(Color(red: 0xcc / 255, green: 0xcc / 255, blue: 0xdd / 255))
+                        }
+                        Spacer(minLength: 12)
+                        if let when = home ? GoHome.when(now) : calendar.nextWhen {
+                            Text(when.day + "\n" + when.time).multilineTextAlignment(.trailing)
+                                .foregroundStyle(Color(red: 0xcc / 255, green: 0xcc / 255, blue: 0xdd / 255))  // #ccccdd
+                        }
+                    }
+                }
+                    .font(.system(size: tuning.textSize, weight: .light))
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, tuning.textPadding)
                     .padding(.top, tuning.textTop)
                     .opacity(dropped ? 1 : 0)
@@ -272,6 +355,49 @@ struct DropPanelView: View {
             .offset(y: popupTop)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    /// 왼쪽 시계와 그 아래 제목. 너비를 고정한 시계는 글자 수가 줄면 커져 아래로 늘어나고 제목은 그만큼 밀린다.
+    /// 제목은 늘 시계 색을 70%로 어둡게 한 색.
+    private func clockColumn(text: String, title: String, color: (r: Double, g: Double, b: Double),
+                             clockVisible: Bool = true) -> some View {
+        let size = ClockFont.size(for: text, width: tuning.countdownWidth)
+        let small = NSFont.systemFont(ofSize: tuning.textSize, weight: .light)
+        let smallCapTop = small.ascender - small.capHeight  // 작은 글 프레임 위 ~ 글자 위 끝
+        return VStack(alignment: .leading, spacing: tuning.countdownGap - smallCapTop - size * ClockFont.descent) {
+            ClockText(text: text, size: size)
+                .foregroundStyle(Color(red: color.r, green: color.g, blue: color.b))
+                .offset(x: tuning.countdownX)
+                .opacity(clockVisible ? 1 : 0)
+            Text(title)
+                .foregroundStyle(Color(red: color.r * 0.7, green: color.g * 0.7, blue: color.b * 0.7))
+        }
+        // 숫자 위 끝이 오른쪽 날짜 글자 위 끝과 같은 높이에 오도록 끌어올린다
+        .padding(.top, smallCapTop - size * ClockFont.capTop - tuning.countdownLift)
+    }
+
+    /// 팝업 자리에 놓인 검정 덮개. 하단 영역 모양만큼은 오려 내서 그 안에 검정이 들어오지 않게 한다.
+    private func popupBlack(opacity: CGFloat) -> some View {
+        blackCover
+            .opacity(opacity)
+            .frame(width: popupSize.width, height: popupSize.height, alignment: .topLeading)
+            .mask {
+                Rectangle()
+                    .overlay { tray(Color.black).opacity(trayShown ? 1 : 0).blendMode(.destinationOut) }
+                    .compositingGroup()
+            }
+            .clipShape(popupShape)
+            .offset(y: popupTop)
+    }
+
+    /// 하단 영역: 팝업 아래쪽에 좌우·아래 여백을 두고 놓은 둥근 사각형. 팝업 크기만 한 틀 안에 그린다.
+    private func tray(_ style: some ShapeStyle) -> some View {
+        let margin = tuning.trayMargin
+        return RoundedRectangle(cornerRadius: trayRadius)
+            .fill(style)
+            .frame(width: max(0, popupSize.width - margin * 2), height: tuning.trayHeight)
+            .padding(.bottom, margin)
+            .frame(width: popupSize.width, height: popupSize.height, alignment: .bottom)
     }
 
     /// 팝업 모양을 위로 길게 늘여 그린 뒤 흐리게 한다.
@@ -333,11 +459,15 @@ struct DropPanelView: View {
                 (0, { withAnimation(.spring(line.grow)) { grown = true } }),
                 (line.dropStart, { withAnimation(.spring(line.drop)) { dropped = true } }),
                 (line.inkStart, { withAnimation(.easeInOut(duration: ink)) { inked = false } }),
+                (line.total + Double(t.trayDelay), {
+                    withAnimation(.easeInOut(duration: Double(t.trayFade))) { trayShown = true } }),
             ]
         } else {
             let k = Double(t.closeSpeed)
             let T = line.total
+            // 하단 영역은 역재생에 넣지 않는다(넣으면 그만큼 늦게 닫힌다). 닫힘 시작과 함께 사라진다.
             steps = [
+                (0, { withAnimation(.easeInOut(duration: Double(t.trayFade) * k)) { trayShown = false } }),
                 (k * (T - line.inkStart - ink), {
                     withAnimation(.easeInOut(duration: ink * k)) { inked = true } }),
                 (k * (T - line.dropStart - line.drop.visibleDuration), {
@@ -413,6 +543,8 @@ struct DropControlView: View {
                     section("노치 확장")
                     sliderRow("너비 +", $tuning.growWidth, 0...300, step: 2)
                     sliderRow("높이 +", $tuning.growHeight, 0...60)
+                    Toggle("닫혀 있을 때도 너비를 늘여 둠", isOn: $tuning.restWide)
+                    sliderRow("닫혔을 때 너비 +", $tuning.restWidth, 0...200)
                     sliderRow("아래 모서리(볼록)", $tuning.grownBottomRadius, 0...60)
                     sliderRow("위 모서리(오목)", $tuning.grownTopRadius, 0...30)
                     radiusNote
@@ -428,16 +560,12 @@ struct DropControlView: View {
                     section("유리")
                     Toggle("clear 유리 (끄면 regular)", isOn: $tuning.clearGlass)
                     sliderRow("검정 틴트", $tuning.tintOpacity, 0...1, step: 0.05)
-
-                    section("글")
-                    sliderRow("글자 크기", $tuning.textSize, 10...30)
-                    sliderRow("좌우 여백", $tuning.textPadding, 0...60)
-                    sliderRow("위 여백", $tuning.textTop, 0...80)
                 }
                 Divider()
                 column {
                     section("마우스")
-                    sliderRow("여는 거리(실제 노치 둘레)", $tuning.hoverMargin, 0...200)
+                    sliderRow("여는 거리(노치 좌우)", $tuning.hoverMargin, 0...200)
+                    sliderRow("여는 거리(노치 아래)", $tuning.hoverDown, 0...200)
                     sliderRow("닫는 거리(노치+팝업 둘레)", $tuning.keepMargin, 0...80)
                     Toggle("설정창이 떠 있으면 펼친 채 유지", isOn: $tuning.holdWhileSettings)
 
@@ -462,6 +590,17 @@ struct DropControlView: View {
                     sliderRow("양옆 들임", $tuning.sideInset, -30...60)
                     sliderRow("불투명도", $tuning.blackOpacity, 0...1, step: 0.05)
                     sliderRow("유리 위 덧칠", $tuning.overBlack, 0...1, step: 0.05)
+
+                    section("하단 영역 (검정 안 들어옴)")
+                    sliderRow("높이", $tuning.trayHeight, 0...200)
+                    sliderRow("좌우·아래 여백", $tuning.trayMargin, 0...40)
+                    sliderRow("흰색 불투명도", $tuning.trayOpacity, 0...1, step: 0.05)
+                    Toggle("모서리 = 팝업 모서리 − 여백 (끄면 팝업과 같은 반지름)", isOn: $tuning.trayConcentric)
+                    Toggle("좌우 완전한 반원", isOn: $tuning.trayCapsule)
+                    Toggle("팝업 아래 모서리를 하단 영역과 같은 중심으로", isOn: $tuning.popupBottomConcentric)
+                    sliderRow("모서리 더하기", $tuning.trayRadiusPlus, -20...30)
+                    sliderRow("등장 끝 기준 나타나는 때", $tuning.trayDelay, -1...3, step: 0.05)
+                    sliderRow("나타나는 시간", $tuning.trayFade, 0.05...2, step: 0.05)
 
                     section("바깥 그림자")
                     sliderRow("진하기", $tuning.shadowOpacity, 0...1, step: 0.05)
@@ -548,6 +687,7 @@ final class SiriDemo: NSObject {
     private var metrics: NotchMetrics?
     private var mouseTimer: Timer?
     private let tuning = DropTuning()
+    private let calendar = CalendarFeed()
 
     func start(metrics: NotchMetrics) {
         self.metrics = metrics
@@ -555,7 +695,8 @@ final class SiriDemo: NSObject {
         let size = CGSize(width: 1000, height: 620)
         let panel = NotchPanel(frame: NotchPanel.topCenterFrame(on: metrics.screen, size: size))
         // 앱이 비활성이어도 활성 모양(유리)으로 그린다. 실제로 효과가 있는 건 NotchPanel의 비공개 메서드 덮어쓰기.
-        let root = DropPanelView(metrics: metrics, onSettings: { [weak self] in self?.toggleSettings() }, tuning: tuning)
+        let root = DropPanelView(metrics: metrics, onSettings: { [weak self] in self?.toggleSettings() },
+                                tuning: tuning, calendar: calendar)
             .environment(\.appearsActive, true)
             .environment(\.controlActiveState, .key)
         panel.contentView = FirstClickHostingView(rootView: root)
@@ -564,6 +705,7 @@ final class SiriDemo: NSObject {
         panel.orderFrontRegardless()
         panel.makeKey()
         self.panel = panel
+        calendar.start()
 
         // 설정창은 처음엔 숨겨 두고, 노치의 설정 아이콘으로 연다. 패널을 가리지 않게 오른쪽 아래에 둔다.
         let control = makeControlWindow(title: "36NOCH 방울 팝업 조절", on: metrics.screen, below: 600,
@@ -634,7 +776,10 @@ final class SiriDemo: NSObject {
 
         // 설정창이 떠 있으면 펼친 채 유지. 설정창을 닫으면 다음 확인(1/60초 뒤)에 바로 아래 규칙으로 돌아가서,
         // 마우스가 노치+팝업 위에 없으면 곧장 닫힌다.
-        let holding = t.holdWhileSettings && (controlWindow?.isVisible ?? false)
+        // 회의 알림도 마찬가지로 마우스와 상관없이 펼친 채 유지한다.
+        let alerting = meetingAlert() || GoHome.isTime(Date(), seconds: GoHome.seconds)
+        if alerting && !t.isOpen { t.isOpen = true }
+        let holding = alerting || (t.holdWhileSettings && (controlWindow?.isVisible ?? false))
         if !holding {
             if t.isOpen {
                 if !keepRect(screen: sf, metrics: metrics, margin: t.keepMargin).contains(mouse) { t.isOpen = false }
@@ -642,13 +787,42 @@ final class SiriDemo: NSObject {
                 let notch = CGRect(x: sf.midX - metrics.width / 2, y: sf.maxY - metrics.height,
                                    width: metrics.width, height: metrics.height)
                 // 위쪽은 화면 끝이라 여백이 필요 없지만, 끝에 붙은 마우스도 잡히게 위로도 넓힌다.
-                if notch.insetBy(dx: -t.hoverMargin, dy: -t.hoverMargin).contains(mouse) { t.isOpen = true }
+                // 화면 좌표는 y가 위로 커진다. 아래쪽만 hoverDown으로 따로 둔다.
+                let hover = CGRect(x: notch.minX - t.hoverMargin, y: notch.minY - t.hoverDown,
+                                   width: notch.width + t.hoverMargin * 2,
+                                   height: notch.height + t.hoverDown + t.hoverMargin)
+                if hover.contains(mouse) { t.isOpen = true }
             }
         }
         // 열려 있고 마우스가 노치+팝업 위에 있을 때만 클릭을 받는다(설정 아이콘).
         // 패널 창은 1000×620으로 커서, 창 전체가 클릭을 받으면 겹친 설정창의 제목 막대·버튼 클릭까지 가로챈다.
         let overContent = keepRect(screen: sf, metrics: metrics, margin: 0).contains(mouse)
         panel.ignoresMouseEvents = !(t.isOpen && overContent)
+    }
+
+    private var alertUntil = Date.distantPast
+    private var alertedTen: String?
+    private var reloadedAfter: String?
+
+    /// 회의 알림: 10분 전이 되면 10초간, 5분 전부터 시작 뒤 10초(00:00 깜빡임)까지 팝업을 열어 둔다.
+    private func meetingAlert() -> Bool {
+        guard let next = calendar.next else { return false }
+        let now = Date()
+        let left = next.start.timeIntervalSince(now)
+        if left <= 0 {
+            // 시작하면 10초간 00:00을 깜빡이며 열어 두고, 닫힘 모션이 끝난 뒤에 다음 회의로 넘어간다
+            if left > -CalendarFeed.blink { return true }
+            if left <= -CalendarFeed.linger && reloadedAfter != next.id {
+                reloadedAfter = next.id
+                calendar.reload()
+            }
+            return false
+        }
+        if left <= 10 * 60 && left > 10 * 60 - 10 && alertedTen != next.id {
+            alertedTen = next.id
+            alertUntil = now.addingTimeInterval(10)
+        }
+        return now < alertUntil || left <= 5 * 60
     }
 
     /// 커진 노치와 팝업(간격 포함)을 감싸는 사각형에 여백을 더한 것, 화면 좌표

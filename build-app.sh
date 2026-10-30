@@ -36,6 +36,8 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>LSMinimumSystemVersion</key><string>14.0</string>
     <key>LSUIElement</key><true/>
     <key>NSHighResolutionCapable</key><true/>
+    <key>NSCalendarsFullAccessUsageDescription</key><string>노치 팝업에 구글 캘린더 일정을 보여 주려고 캘린더를 읽습니다.</string>
+    <key>NSCalendarsUsageDescription</key><string>노치 팝업에 구글 캘린더 일정을 보여 주려고 캘린더를 읽습니다.</string>
 </dict>
 </plist>
 PLIST
