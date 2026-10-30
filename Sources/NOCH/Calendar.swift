@@ -24,10 +24,26 @@ final class CalendarFeed: ObservableObject {
 
     enum Status { case unknown, denied, noAccount, ready }
 
+    /// 맥 캘린더 앱에 있는 계정 하나(캘린더가 있는 것만). 팝업의 계정 고르기 목록에 쓴다.
+    struct Account: Identifiable, Equatable {
+        let id: String          // EKSource.sourceIdentifier. 맥마다 다르다
+        let title: String       // 구글 계정은 이메일이 아니라 "Google"
+        let calendars: [String]
+    }
+
     @Published private(set) var status: Status = .unknown
     @Published private(set) var today: [Item] = []
     /// 지금 이후 처음 시작하는 회의(종일 일정 제외). 며칠 뒤여도 된다. 남은 시간 표시에 쓴다.
     @Published private(set) var next: Item?
+    /// 팝업에서 계정을 고르는 중인지. 고르는 동안은 마우스와 상관없이 팝업을 열어 둔다.
+    @Published private(set) var picking = false
+    @Published private(set) var accounts: [Account] = []
+    /// "Later"를 누르면 이번 실행 동안은 계정 고르기를 저절로 띄우지 않는다
+    private var pickingDismissed = false
+
+    /// 고른 계정(EKSource.sourceIdentifier)을 저장하는 키
+    private static let sourceKey = "calendarSourceID"
+    var selectedID: String? { UserDefaults.standard.string(forKey: Self.sourceKey) }
 
     private let store = EKEventStore()
     private var observer: NSObjectProtocol?
@@ -45,6 +61,7 @@ final class CalendarFeed: ObservableObject {
                 guard let self else { return }
                 if !granted {
                     self.status = .denied
+                    self.offerPicking()  // 팝업에서 "시스템 설정 열기"를 안내
                     say("캘린더: 접근 거부됨", error?.localizedDescription ?? "")
                     return
                 }
@@ -53,6 +70,8 @@ final class CalendarFeed: ObservableObject {
                     Task { @MainActor in self?.reload() }
                 }
                 self.reload()
+                // 시험용: `--test-account-picker` 로 띄우면 계정 고르기를 바로 연다
+                if CommandLine.arguments.contains("--test-account-picker") { self.startPicking() }
             }
         }
     }
@@ -60,6 +79,7 @@ final class CalendarFeed: ObservableObject {
     /// 오늘 남은 일정(지금 진행 중인 것 포함)을 다시 읽는다
     func reload() {
         guard EKEventStore.authorizationStatus(for: .event) == .fullAccess else { return }
+        if picking { loadAccounts() }  // 고르는 중 시스템 설정에서 계정을 넣으면 목록에 바로 나타나게
         let calendars = accountCalendars()
         if calendars.isEmpty {
             status = .noAccount
@@ -67,8 +87,10 @@ final class CalendarFeed: ObservableObject {
                 say("캘린더: 계정 \(source.title)(\(source.sourceType.rawValue)):",
                     source.calendars(for: .event).map(\.title).sorted())
             }
-            say("캘린더: \(Self.account) 계정을 찾지 못함")
+            say("캘린더: 고른 계정이 없음 → 팝업에서 고르기")
             today = []
+            next = nil
+            offerPicking()
             return
         }
         let now = Date()
@@ -91,31 +113,87 @@ final class CalendarFeed: ObservableObject {
         say("캘린더: \(calendars.map(\.title)) 에서 오늘 남은 일정 \(today.count)개")
     }
 
-    /// 캘린더 앱은 구글 계정 이름을 이메일이 아니라 "Google"로 둔다. 구글 계정의 기본 캘린더 이름이
-    /// 이메일 주소이므로, 그 캘린더를 가진 계정을 찾아 그 계정의 캘린더를 모두 쓴다.
+    /// 고른 계정의 캘린더. 고른 적이 없으면 예전 규칙으로 찾아서(집·회사 맥) 그 계정을 고른 것으로 저장한다.
+    /// 고른 계정이 사라졌거나 찾지 못하면 빈 배열 → 팝업에서 고르게 한다.
     private func accountCalendars() -> [EKCalendar] {
+        if let id = selectedID {
+            let calendars = store.sources.first { $0.sourceIdentifier == id }?.calendars(for: .event) ?? []
+            return Array(calendars)
+        }
+        guard let source = guessSource() else { return [] }
+        UserDefaults.standard.set(source.sourceIdentifier, forKey: Self.sourceKey)
+        say("캘린더: 예전 규칙으로 \(source.title) 계정을 골라 둠")
+        return Array(source.calendars(for: .event))
+    }
+
+    /// 예전 규칙: 기본 캘린더 이름이 이메일(회사 맥)인 계정, 아니면 캘린더가 있는 "Google" 계정이 하나뿐일 때 그것(집 맥).
+    /// 캘린더 앱은 구글 계정 이름(EKSource.title)을 이메일이 아니라 "Google"로 둔다.
+    private func guessSource() -> EKSource? {
+        let name = Self.account.components(separatedBy: "@")[0]
         for source in store.sources {
             let calendars = source.calendars(for: .event)
-            let name = Self.account.components(separatedBy: "@")[0]
             let isAccount = source.title == Self.account || source.title == name
                 || calendars.contains(where: { $0.title == Self.account })
-            if isAccount && !calendars.isEmpty {
-                return Array(calendars)
-            }
+            if isAccount && !calendars.isEmpty { return source }
         }
-        // 집 맥처럼 기본 캘린더 이름이 이메일이 아니라 사람 이름("Byeongsu Kim")이면 위에서 못 찾는다.
-        // 캘린더가 있는 "Google" 계정이 하나뿐이면 그 계정을 쓴다.
         let google = store.sources.filter { $0.title == "Google" && !$0.calendars(for: .event).isEmpty }
-        if google.count == 1 { return Array(google[0].calendars(for: .event)) }
-        return []
+        return google.count == 1 ? google[0] : nil
+    }
+
+    // MARK: 계정 고르기(팝업)
+
+    /// 캘린더가 있는 계정 목록을 다시 읽는다. 캘린더가 없는 빈 계정은 뺀다.
+    func loadAccounts() {
+        accounts = store.sources.compactMap { source in
+            let calendars = source.calendars(for: .event).map(\.title).sorted()
+            guard !calendars.isEmpty else { return nil }
+            return Account(id: source.sourceIdentifier, title: source.title, calendars: calendars)
+        }
+        .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+    }
+
+    /// 저절로 띄우는 경우(첫 실행, 고른 계정이 없어짐, 권한 거부). "Later"를 눌렀으면 이번 실행에서는 다시 안 띄운다.
+    private func offerPicking() {
+        guard !pickingDismissed else { return }
+        startPicking()
+    }
+
+    /// 메뉴의 "캘린더 계정…", 또는 팝업의 안내 글을 눌렀을 때
+    func startPicking() {
+        if status != .denied { loadAccounts() }
+        pickingDismissed = false
+        picking = true
+    }
+
+    func choose(_ account: Account) {
+        UserDefaults.standard.set(account.id, forKey: Self.sourceKey)
+        picking = false
+        say("캘린더: \(account.title) 계정을 고름", account.calendars)
+        reload()
+    }
+
+    func later() {
+        picking = false
+        pickingDismissed = true
+    }
+
+    /// 목록에 없는 계정은 시스템 설정 > 인터넷 계정에서 로그인해 넣는다(맥 기본 기능, 무료).
+    /// 넣고 나면 EKEventStoreChanged로 목록이 저절로 바뀐다.
+    func openInternetAccounts() {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.Internet-Accounts-Settings.extension")!)
+    }
+
+    /// 권한을 거부했을 때: 시스템 설정 > 개인정보 보호 및 보안 > 캘린더
+    func openPrivacySettings() {
+        NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars")!)
     }
 
     /// 팝업에 임시로 띄울 글(영어). 화면 구성은 나중에 정한다.
     var summary: String {
         switch status {
         case .unknown: return "Connecting to calendar…"
-        case .denied: return "Calendar access denied. Allow 36NOCH in System Settings > Privacy & Security > Calendars."
-        case .noAccount: return "No calendars found for \(Self.account)"
+        case .denied: return "Calendar access denied. Click to allow."
+        case .noAccount: return "No calendar account. Click to choose."
         case .ready:
             // 임시: 다음 회의가 있으면 그 제목(날짜·시각은 오른쪽에 따로, nextWhen)
             if let next { return next.title }

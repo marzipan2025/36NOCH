@@ -198,7 +198,7 @@ struct DropPanelView: View {
     // 떨어지기 전에는 실제(하드웨어) 노치보다 조금 좁고 낮게 숨어 있다가,
     // 떨어지면서 커진 노치 너비까지 넓어지며 드러난다. 하드웨어 노치는 불투명해서 그 밑은 화면에 안 보인다.
     private var popupSize: CGSize {
-        dropped ? CGSize(width: metrics.width + tuning.growWidth, height: tuning.popupHeight)
+        dropped ? CGSize(width: metrics.width + tuning.growWidth, height: tuning.popupHeight(calendar: calendar, metrics: metrics))
                 : CGSize(width: max(1, metrics.width - tuning.waitInset), height: tuning.grainHeight)
     }
     private var popupTop: CGFloat {
@@ -338,10 +338,23 @@ struct DropPanelView: View {
             ZStack(alignment: .topLeading) {
                 tray(Color.white.opacity(tuning.trayOpacity))
                     .opacity(trayShown ? 1 : 0)
+                if calendar.picking {
+                    AccountTrayButtons(calendar: calendar, textSize: tuning.textSize)
+                        .padding(.horizontal, trayRadius * 0.4)
+                        .frame(width: max(0, popupSize.width - tuning.trayMargin * 2), height: tuning.trayHeight)
+                        .padding(.bottom, tuning.trayMargin)
+                        .frame(width: popupSize.width, height: popupSize.height, alignment: .bottom)
+                        .opacity(trayShown ? 1 : 0)
+                }
                 rim
                 // 왼쪽: 남은 시간(금색) 아래에 회의 제목(어두운 금색). 오른쪽: 날짜·시각 두 줄.
                 // 0.5초마다 다시 그린다(남은 시간, 퇴근 알림, 00:00 깜빡임, 콜론 깜빡임).
                 // 초 경계에서 시작해 숫자와 콜론이 같은 순간에 바뀌게 한다.
+                // 계정을 고르는 중이면 시계 자리에 계정 목록(AccountPicker)
+                Group { if calendar.picking {
+                    AccountPicker(calendar: calendar, textSize: tuning.textSize)
+                        .frame(height: max(0, popupSize.height - tuning.textTop - tuning.trayHeight - tuning.trayMargin - 8))
+                } else {
                 TimelineView(.periodic(from: Date(timeIntervalSinceReferenceDate: Date().timeIntervalSinceReferenceDate.rounded(.down)), by: 0.5)) { context in
                     let now = context.date
                     // 퇴근 알림은 닫힘 모션이 끝날 때까지(10초 + 2초) 그대로 보여 준다
@@ -366,6 +379,9 @@ struct DropPanelView: View {
                         } else {
                             Text(calendar.summary)
                                 .foregroundStyle(Color(red: 0xcc / 255, green: 0xcc / 255, blue: 0xdd / 255))
+                                .onTapGesture {
+                                    if calendar.status == .noAccount || calendar.status == .denied { calendar.startPicking() }
+                                }
                         }
                         Spacer(minLength: 12)
                         if let when = home ? GoHome.when(now) : calendar.nextWhen {
@@ -374,6 +390,7 @@ struct DropPanelView: View {
                         }
                     }
                 }
+                } }
                     .font(.system(size: tuning.textSize, weight: .light))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, tuning.textPadding)
@@ -384,6 +401,9 @@ struct DropPanelView: View {
             .clipShape(popupShape)
             .offset(y: popupTop)
         }
+        // 계정 고르기로 팝업 높이가 바뀔 때 부드럽게
+        .animation(.spring(duration: 0.45, bounce: 0.15), value: calendar.picking)
+        .animation(.spring(duration: 0.45, bounce: 0.15), value: calendar.accounts.count)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
@@ -814,6 +834,9 @@ final class SiriDemo: NSObject {
         menu.addItem(update)
         updateItem = update
         menu.addItem(.separator())
+        let account = NSMenuItem(title: "캘린더 계정…", action: #selector(menuCalendarAccount), keyEquivalent: "")
+        account.target = self
+        menu.addItem(account)
         let settings = NSMenuItem(title: "설정…", action: #selector(menuSettings), keyEquivalent: ",")
         settings.target = self
         menu.addItem(settings)
@@ -825,6 +848,7 @@ final class SiriDemo: NSObject {
     }
 
     @objc private func menuSettings() { toggleSettings() }
+    @objc private func menuCalendarAccount() { calendar.startPicking() }
 
     /// 새 버전이 있으면 바로 업데이트, 없으면 확인하고 결과를 알린다
     @objc private func menuUpdate() {
@@ -871,7 +895,8 @@ final class SiriDemo: NSObject {
         // 설정창이 떠 있으면 펼친 채 유지. 설정창을 닫으면 다음 확인(1/60초 뒤)에 바로 아래 규칙으로 돌아가서,
         // 마우스가 노치+팝업 위에 없으면 곧장 닫힌다.
         // 회의 알림도 마찬가지로 마우스와 상관없이 펼친 채 유지한다.
-        let alerting = meetingAlert() || GoHome.isTime(Date(), seconds: GoHome.seconds)
+        // 팝업에서 캘린더 계정을 고르는 동안도 열어 둔다.
+        let alerting = meetingAlert() || GoHome.isTime(Date(), seconds: GoHome.seconds) || calendar.picking
         if alerting && !t.isOpen { t.isOpen = true }
         let holding = alerting || (t.holdWhileSettings && (controlWindow?.isVisible ?? false))
         if !holding {
@@ -923,7 +948,7 @@ final class SiriDemo: NSObject {
     private func keepRect(screen sf: CGRect, metrics: NotchMetrics, margin: CGFloat) -> CGRect {
         let t = tuning
         let width = metrics.width + t.growWidth
-        let height = metrics.height + t.growHeight + t.gap + t.popupHeight
+        let height = metrics.height + t.growHeight + t.gap + t.popupHeight(calendar: calendar, metrics: metrics)
         return CGRect(x: sf.midX - width / 2, y: sf.maxY - height, width: width, height: height)
             .insetBy(dx: -margin, dy: -margin)
     }
@@ -951,5 +976,19 @@ extension SiriDemo: NSMenuDelegate {
             updateItem?.title = updates.available.map { "\($0.version)(으)로 업데이트" } ?? "업데이트 확인…"
         }
         updateItem?.isEnabled = updates.state != .installing && updates.state != .checking
+    }
+}
+
+extension DropTuning {
+    /// 지금 팝업 높이. 캘린더 계정을 고르는 동안은 목록이 다 들어가게 늘린다(계정 한 줄 약 40pt).
+    /// 다만 화면 높이의 절반, 그리고 노치 패널(620) 안에 그림자까지 들어가는 높이를 넘지 않는다. 넘치면 목록이 스크롤된다.
+    @MainActor
+    func popupHeight(calendar: CalendarFeed, metrics: NotchMetrics) -> CGFloat {
+        guard calendar.picking, calendar.status != .denied, !calendar.accounts.isEmpty else { return popupHeight }
+        let top = metrics.height + growHeight + gap  // 화면 위 끝 ~ 팝업 위 끝
+        let list = 16 + 6 + CGFloat(calendar.accounts.count) * AccountPicker.rowHeight + 8
+        let needed = textTop + list + trayHeight + trayMargin
+        let limit = min(metrics.screen.frame.height / 2, 620 - 40) - top
+        return max(popupHeight, min(needed, limit))
     }
 }
