@@ -22,7 +22,7 @@ final class DropTuning: ObservableObject {
     @Published var grownBottomRadius: CGFloat = 26   // 커진 노치 아래 모서리(볼록). 원래 노치 10
     @Published var grownTopRadius: CGFloat = 12      // 커진 노치 위 모서리(오목). 원래 노치 6
     // 팝업 방울
-    @Published var popupHeight: CGFloat = 220
+    @Published var popupHeight: CGFloat = 240
     @Published var popupRadius: CGFloat = 26
     @Published var gap: CGFloat = 12                 // 커진 노치 아래 끝과 팝업 위 끝 사이
     @Published var spacing: CGFloat = 12             // GlassEffectContainer가 두 유리를 붙이는 거리
@@ -62,7 +62,8 @@ final class DropTuning: ObservableObject {
     // 글: 확정한 값이라 설정창·저장에서 뺐다(2026-10-30)
     let textSize: CGFloat = 11
     let textPadding: CGFloat = 22
-    let textTop: CGFloat = 18
+    let textTop: CGFloat = 38                // 팝업 위 끝 ~ 시계·글 위 끝(2026-10-31 18에서 20 내림, 팝업 높이도 20 늘림)
+    let popupExtraWidth: CGFloat = 24        // 팝업이 커진 노치보다 넓은 양(양쪽 합, 한쪽 12)
     // 다음 회의까지 남은 시간(Distro Mix, 금색). 너비를 고정하고, 글자 수가 줄면 그만큼 글자가 커져 아래로 늘어난다.
     let countdownWidth: CGFloat = 204     // 시계 너비. 204면 8자리(70:02:31)가 약 49pt
     let countdownGap: CGFloat = 12        // 숫자 아래 끝 ~ 제목 글자 위 끝
@@ -86,10 +87,10 @@ final class DropTuning: ObservableObject {
     @Published var isOpen = false
 
     /// 7차 설정(= 기본값): 2026-10-31 집 맥에서 사용자가 맞춘 값. 6차에서 노치 높이 + 8→12, 노치와 간격 10→12,
-    /// 붙는 거리 14→12, 검정 반지름 60.5→60. (6차: 5차에서 검정 위로 75→96, 흐림 27.5→28.5, 반지름 33→60.5.)
+    /// 붙는 거리 14→12, 검정 반지름 60.5→60. 이어서 시계·글을 20 내리면서 팝업 높이 220→240. (6차: 5차에서 검정 위로 75→96, 흐림 27.5→28.5, 반지름 33→60.5.)
     /// 조절하다가 이 값으로 되돌릴 때 쓴다.
     func applySeventhPreset() {
-        growWidth = 100; growHeight = 12; restWide = true; restWidth = 44; grownBottomRadius = 26; grownTopRadius = 12; popupHeight = 220
+        growWidth = 100; growHeight = 12; restWide = true; restWidth = 44; grownBottomRadius = 26; grownTopRadius = 12; popupHeight = 240
         popupRadius = 26; gap = 12; spacing = 12; grainHeight = 34; waitInset = 4
         inkDelay = 0; inkDuration = 0.65; inkNeck = true; clearGlass = true; tintOpacity = 0
         lift = 96; softness = 28.5; blackRadius = 60; sideInset = -5.5; blackOpacity = 1; overBlack = 0.65
@@ -198,7 +199,8 @@ struct DropPanelView: View {
     // 떨어지기 전에는 실제(하드웨어) 노치보다 조금 좁고 낮게 숨어 있다가,
     // 떨어지면서 커진 노치 너비까지 넓어지며 드러난다. 하드웨어 노치는 불투명해서 그 밑은 화면에 안 보인다.
     private var popupSize: CGSize {
-        dropped ? CGSize(width: metrics.width + tuning.growWidth, height: tuning.popupHeight(calendar: calendar, metrics: metrics))
+        dropped ? CGSize(width: metrics.width + tuning.growWidth + tuning.popupExtraWidth,
+                         height: tuning.popupHeight(calendar: calendar, metrics: metrics))
                 : CGSize(width: max(1, metrics.width - tuning.waitInset), height: tuning.grainHeight)
     }
     private var popupTop: CGFloat {
@@ -348,8 +350,8 @@ struct DropPanelView: View {
                 Group { if calendar.picking {
                     AccountPicker(calendar: calendar, textSize: tuning.textSize,
                                   onLater: { calendar.later(); tuning.isOpen = false })
-                        // 계정마다 검정 상자에 담기므로 아래 투명한 유리까지 내려가도 된다. 아래 여백은 위(textTop)와 같게.
-                        .frame(height: max(0, popupSize.height - tuning.textTop * 2))
+                        // 계정마다 검정 상자에 담기므로 아래 투명한 유리까지 내려가도 된다. 아래 여백은 18.
+                        .frame(height: max(0, popupSize.height - tuning.textTop - 18))
                 } else {
                 TimelineView(.periodic(from: Date(timeIntervalSinceReferenceDate: Date().timeIntervalSinceReferenceDate.rounded(.down)), by: 0.5)) { context in
                     let now = context.date
@@ -944,7 +946,7 @@ final class SiriDemo: NSObject {
     /// 커진 노치와 팝업(간격 포함)을 감싸는 사각형에 여백을 더한 것, 화면 좌표
     private func keepRect(screen sf: CGRect, metrics: NotchMetrics, margin: CGFloat) -> CGRect {
         let t = tuning
-        let width = metrics.width + t.growWidth
+        let width = metrics.width + t.growWidth + t.popupExtraWidth  // 팝업이 커진 노치보다 넓다
         let height = metrics.height + t.growHeight + t.gap + t.popupHeight(calendar: calendar, metrics: metrics)
         return CGRect(x: sf.midX - width / 2, y: sf.maxY - height, width: width, height: height)
             .insetBy(dx: -margin, dy: -margin)
@@ -977,7 +979,7 @@ extension SiriDemo: NSMenuDelegate {
 }
 
 extension DropTuning {
-    /// 지금 팝업 높이. 캘린더 계정을 고르는 동안은 목록이 다 들어가게 늘린다(아래 여백은 위와 같게).
+    /// 지금 팝업 높이. 캘린더 계정을 고르는 동안은 목록이 다 들어가게 늘린다(아래 여백 18).
     /// 다만 화면 높이의 절반, 그리고 노치 패널(620) 안에 그림자까지 들어가는 높이를 넘지 않는다. 넘치면 목록이 스크롤된다.
     @MainActor
     func popupHeight(calendar: CalendarFeed, metrics: NotchMetrics) -> CGFloat {
@@ -986,7 +988,7 @@ extension DropTuning {
         let n = CGFloat(calendar.accounts.count)
         let list = 16 + AccountPicker.titleGap + n * AccountPicker.rowHeight + n * AccountPicker.rowGap
             + AccountPicker.laterHeight  // 맨 끝 "Later"
-        let needed = textTop + list + textTop
+        let needed = textTop + list + 18
         let limit = min(metrics.screen.frame.height / 2, 620 - 40) - top
         return max(popupHeight, min(needed, limit))
     }
