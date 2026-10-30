@@ -252,6 +252,7 @@ struct DropPanelView: View {
     /// 오른쪽 원이 설정창을 연다. 왼쪽 원은 아직 하는 일이 없다.
     @State private var hoverLeft = false
     @State private var hoverRight = false
+    @State private var hoverTitle = false
 
     private var notchButtons: some View {
         let d: CGFloat = 14
@@ -381,12 +382,20 @@ struct DropPanelView: View {
                 .offset(x: tuning.countdownX)
                 .opacity(clockVisible ? 1 : 0)
             Text(title)
-                .foregroundStyle(Color(red: color.r * 0.7, green: color.g * 0.7, blue: color.b * 0.7))
+                .foregroundStyle(titleColor(color, hover: onTitle != nil && hoverTitle))
                 .offset(x: -1, y: 2)  // 좌우 여백 22에서 왼쪽으로 1, 아래로 2
+                .onHover { hoverTitle = $0 }
                 .onTapGesture { onTitle?() }
         }
         // 숫자 위 끝이 오른쪽 날짜 글자 위 끝과 같은 높이에 오도록 끌어올린다
         .padding(.top, smallCapTop - size * ClockFont.capTop - tuning.countdownLift)
+    }
+
+    /// 제목 색: 시계 색의 70%. 누를 수 있는 제목에 마우스를 올리면 흰색을 30% 섞는다.
+    private func titleColor(_ c: (r: Double, g: Double, b: Double), hover: Bool) -> Color {
+        let mix = hover ? 0.3 : 0
+        func ch(_ v: Double) -> Double { v * 0.7 * (1 - mix) + mix }
+        return Color(red: ch(c.r), green: ch(c.g), blue: ch(c.b))
     }
 
     /// 회의 제목을 누르면 캘린더 앱을 띄운다
