@@ -11,12 +11,12 @@ import SwiftUI
 
 import Combine
 
-/// 모든 조절 값. 기본값은 2026-10-31 사용자가 맞춘 6차 설정.
+/// 모든 조절 값. 기본값은 2026-10-31 사용자가 맞춘 7차 설정.
 /// 바꾼 값은 UserDefaults에 저장해서 앱을 다시 켜도 이어진다.
 final class DropTuning: ObservableObject {
     // 노치 확장
     @Published var growWidth: CGFloat = 100
-    @Published var growHeight: CGFloat = 8
+    @Published var growHeight: CGFloat = 12
     @Published var restWide = true                  // 닫혀 있을 때도 노치 검정을 좌우로 늘여 둔다
     @Published var restWidth: CGFloat = 44           // 그때 늘이는 너비(양쪽 합, 한쪽 22)
     @Published var grownBottomRadius: CGFloat = 26   // 커진 노치 아래 모서리(볼록). 원래 노치 10
@@ -24,8 +24,8 @@ final class DropTuning: ObservableObject {
     // 팝업 방울
     @Published var popupHeight: CGFloat = 220
     @Published var popupRadius: CGFloat = 26
-    @Published var gap: CGFloat = 10                 // 커진 노치 아래 끝과 팝업 위 끝 사이
-    @Published var spacing: CGFloat = 14             // GlassEffectContainer가 두 유리를 붙이는 거리
+    @Published var gap: CGFloat = 12                 // 커진 노치 아래 끝과 팝업 위 끝 사이
+    @Published var spacing: CGFloat = 12             // GlassEffectContainer가 두 유리를 붙이는 거리
     @Published var grainHeight: CGFloat = 34         // 떨어지기 전 팝업 높이(실제 노치 밑에 숨어 있음)
     @Published var waitInset: CGFloat = 4            // 대기 중 팝업을 실제 노치보다 좁힐 너비(양쪽 합). 하드웨어 노치에 완전히 가려지게
     @Published var inkDelay: CGFloat = 0             // 떨어지기 시작하고 검정이 빠지기 시작할 때까지(초)
@@ -37,7 +37,7 @@ final class DropTuning: ObservableObject {
     // 검정 덮개: 팝업 모양을 위로 끌어올려 흐리게 만든 검정. 흐린 경계가 모서리 곡선을 따라 휜다.
     @Published var lift: CGFloat = 96              // 검정 아래 끝을 팝업 아래 끝보다 얼마나 위로
     @Published var softness: CGFloat = 28.5          // 흐림 = 검정이 사라지는 구간 길이
-    @Published var blackRadius: CGFloat = 60.5         // 검정 모양의 아래 모서리 반지름(휘어짐 정도)
+    @Published var blackRadius: CGFloat = 60         // 검정 모양의 아래 모서리 반지름(휘어짐 정도)
     @Published var sideInset: CGFloat = -5.5          // 양옆에서 들임. 키우면 옆 가장자리에 유리가 더 드러남
     @Published var blackOpacity: CGFloat = 1
     @Published var overBlack: CGFloat = 0.65          // 같은 검정 모양을 유리 "위"에도 이만큼 덧칠. 유리가 검정을 밝혀 보이게 하는 만큼 다시 어둡게
@@ -85,14 +85,14 @@ final class DropTuning: ObservableObject {
     /// 바뀔 때마다 패널이 열기/닫기 모션을 한다. 마우스 위치(SiriDemo)나 설정창 버튼이 바꾼다.
     @Published var isOpen = false
 
-    /// 6차 설정(= 기본값): 2026-10-31 집 맥에서 사용자가 맞춘 값. 5차에서 검정 위로 75→96, 흐림 27.5→28.5, 검정 반지름 33→60.5.
-    /// (5차는 4차에서 검정 위로 35.5→75, 흐림 22.5→27.5, 반지름 60→33, 양옆 들임 −10→−5.5, 덧칠 0.5→0.65,
-    /// 하단 영역 높이 56→58.5·여백 20→24, 테두리 흐림 1.5→1.) 조절하다가 이 값으로 되돌릴 때 쓴다.
-    func applySixthPreset() {
-        growWidth = 100; growHeight = 8; restWide = true; restWidth = 44; grownBottomRadius = 26; grownTopRadius = 12; popupHeight = 220
-        popupRadius = 26; gap = 10; spacing = 14; grainHeight = 34; waitInset = 4
+    /// 7차 설정(= 기본값): 2026-10-31 집 맥에서 사용자가 맞춘 값. 6차에서 노치 높이 + 8→12, 노치와 간격 10→12,
+    /// 붙는 거리 14→12, 검정 반지름 60.5→60. (6차: 5차에서 검정 위로 75→96, 흐림 27.5→28.5, 반지름 33→60.5.)
+    /// 조절하다가 이 값으로 되돌릴 때 쓴다.
+    func applySeventhPreset() {
+        growWidth = 100; growHeight = 12; restWide = true; restWidth = 44; grownBottomRadius = 26; grownTopRadius = 12; popupHeight = 220
+        popupRadius = 26; gap = 12; spacing = 12; grainHeight = 34; waitInset = 4
         inkDelay = 0; inkDuration = 0.65; inkNeck = true; clearGlass = true; tintOpacity = 0
-        lift = 96; softness = 28.5; blackRadius = 60.5; sideInset = -5.5; blackOpacity = 1; overBlack = 0.65
+        lift = 96; softness = 28.5; blackRadius = 60; sideInset = -5.5; blackOpacity = 1; overBlack = 0.65
         trayHeight = 58.5; trayMargin = 24; trayOpacity = 0.1; trayConcentric = true
         trayRadiusPlus = 4; trayDelay = -0.2; trayFade = 0.3; trayCapsule = true; popupBottomConcentric = true
         rimOpacity = 0.05; rimWidth = 1; rimSoftness = 1; shadowOpacity = 0.3; shadowRadius = 28
@@ -212,11 +212,12 @@ struct DropPanelView: View {
         return tuning.tintOpacity > 0 ? base.tint(.black.opacity(tuning.tintOpacity)) : base
     }
 
-    /// 위 두 모서리는 팝업 반지름, 아래 두 모서리는 켜 두면 하단 영역 곡선과 같은 중심이 되게 한다.
+    /// 아래 두 모서리는 켜 두면 하단 영역 곡선과 같은 중심(하단 영역 반지름 + 여백), 끄면 팝업 반지름.
+    /// 위 두 모서리도 아래와 같은 값으로 둥글린다(2026-10-31). 팝업 반지름 값은 아래 같은 중심을 끈 때와 하단 영역 계산에만 쓴다.
     private var popupShape: UnevenRoundedRectangle {
         let limit = min(popupSize.height / 2, popupSize.width / 2)
-        let top = min(tuning.popupRadius, limit)
-        let bottom = tuning.popupBottomConcentric ? min(trayRadius + tuning.trayMargin, limit) : top
+        let bottom = tuning.popupBottomConcentric ? min(trayRadius + tuning.trayMargin, limit) : min(tuning.popupRadius, limit)
+        let top = bottom
         return UnevenRoundedRectangle(topLeadingRadius: top, bottomLeadingRadius: bottom,
                                       bottomTrailingRadius: bottom, topTrailingRadius: top)
     }
@@ -606,7 +607,7 @@ struct DropControlView: View {
                 Button("닫기") { tuning.isOpen = false }
                 Button("다시 재생") { replay() }
                 Spacer()
-                Button("6차설정") { tuning.applySixthPreset(); replay() }
+                Button("7차설정") { tuning.applySeventhPreset(); replay() }
                 Button("종료") { NSApp.terminate(nil) }
             }
             .padding(16)
