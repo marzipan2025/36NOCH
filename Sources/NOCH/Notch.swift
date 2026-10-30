@@ -36,14 +36,20 @@ struct NotchShape: Shape {
     var topRadius: CGFloat
     var outset: CGFloat = 0
 
-    // 펼침 애니메이션에서 크기와 아래 모서리가 부드럽게 바뀌도록
-    var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, CGFloat> {
-        get { AnimatablePair(AnimatablePair(width, height), bottomRadius) }
+    // 펼침 애니메이션에서 크기와 두 모서리가 부드럽게 바뀌도록
+    var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, AnimatablePair<CGFloat, CGFloat>> {
+        get { AnimatablePair(AnimatablePair(width, height), AnimatablePair(bottomRadius, topRadius)) }
         set {
             width = newValue.first.first
             height = newValue.first.second
-            bottomRadius = newValue.second
+            bottomRadius = newValue.second.first
+            topRadius = newValue.second.second
         }
+    }
+
+    /// 아래 모서리 반지름의 기하학적 최대. 옆면 직선이 0이 되는 지점(높이 − 위 반지름)이고, 너비 절반도 넘을 수 없다.
+    static func maxBottomRadius(width: CGFloat, height: CGFloat, topRadius: CGFloat) -> CGFloat {
+        max(0, min(height - topRadius, width / 2))
     }
 
     func path(in rect: CGRect) -> Path {
@@ -52,8 +58,8 @@ struct NotchShape: Shape {
         let left = rect.midX - width / 2 - outset
         let right = rect.midX + width / 2 + outset
         let bottom = height + outset
-        let br = max(0, min(bottomRadius + outset, (right - left) / 2, bottom))
         let tr = max(0, topRadius - outset)
+        let br = max(0, min(bottomRadius + outset, (right - left) / 2, bottom - tr))
 
         var p = Path()
         // 왼쪽 위: 화면 테두리에서 옆면으로 오목하게 꺾임
@@ -143,6 +149,6 @@ func sliderRow(_ label: String, _ value: Binding<CGFloat>, _ range: ClosedRange<
     HStack {
         Text(label).frame(width: 120, alignment: .leading)
         Slider(value: value, in: range, step: step)
-        Text(String(format: "%.1f", value.wrappedValue)).monospacedDigit().frame(width: 40)
+        Text(String(format: step < 0.1 ? "%.2f" : "%.1f", value.wrappedValue)).monospacedDigit().frame(width: 44)
     }
 }
