@@ -11,7 +11,7 @@ import SwiftUI
 
 import Combine
 
-/// 모든 조절 값. 기본값은 2026-10-30 사용자가 맞춘 4차 설정.
+/// 모든 조절 값. 기본값은 2026-10-31 사용자가 맞춘 5차 설정.
 /// 바꾼 값은 UserDefaults에 저장해서 앱을 다시 켜도 이어진다.
 final class DropTuning: ObservableObject {
     // 노치 확장
@@ -35,15 +35,15 @@ final class DropTuning: ObservableObject {
     @Published var clearGlass = true
     @Published var tintOpacity: CGFloat = 0
     // 검정 덮개: 팝업 모양을 위로 끌어올려 흐리게 만든 검정. 흐린 경계가 모서리 곡선을 따라 휜다.
-    @Published var lift: CGFloat = 35.5              // 검정 아래 끝을 팝업 아래 끝보다 얼마나 위로
-    @Published var softness: CGFloat = 22.5          // 흐림 = 검정이 사라지는 구간 길이
-    @Published var blackRadius: CGFloat = 60         // 검정 모양의 아래 모서리 반지름(휘어짐 정도)
-    @Published var sideInset: CGFloat = -10          // 양옆에서 들임. 키우면 옆 가장자리에 유리가 더 드러남
+    @Published var lift: CGFloat = 75              // 검정 아래 끝을 팝업 아래 끝보다 얼마나 위로
+    @Published var softness: CGFloat = 27.5          // 흐림 = 검정이 사라지는 구간 길이
+    @Published var blackRadius: CGFloat = 33         // 검정 모양의 아래 모서리 반지름(휘어짐 정도)
+    @Published var sideInset: CGFloat = -5.5          // 양옆에서 들임. 키우면 옆 가장자리에 유리가 더 드러남
     @Published var blackOpacity: CGFloat = 1
-    @Published var overBlack: CGFloat = 0.5          // 같은 검정 모양을 유리 "위"에도 이만큼 덧칠. 유리가 검정을 밝혀 보이게 하는 만큼 다시 어둡게
+    @Published var overBlack: CGFloat = 0.65          // 같은 검정 모양을 유리 "위"에도 이만큼 덧칠. 유리가 검정을 밝혀 보이게 하는 만큼 다시 어둡게
     // 하단 영역: 팝업 아래쪽 안에 둔 흰 반투명 면. 이 안에는 검정이 들어오지 않는다.
-    @Published var trayHeight: CGFloat = 56
-    @Published var trayMargin: CGFloat = 20          // 좌우·아래 여백
+    @Published var trayHeight: CGFloat = 58.5
+    @Published var trayMargin: CGFloat = 24          // 좌우·아래 여백
     @Published var trayOpacity: CGFloat = 0.1        // 흰색 불투명도
     @Published var trayConcentric = true             // 켜면 모서리 = 팝업 모서리 − 여백(같은 중심의 곡선), 끄면 팝업과 같은 반지름
     @Published var trayRadiusPlus: CGFloat = 4       // 위 규칙으로 정한 모서리에 더하는 값
@@ -54,7 +54,7 @@ final class DropTuning: ObservableObject {
     // 덧그린 테두리 빛
     @Published var rimOpacity: CGFloat = 0.05        // 유리 자체 테두리 위에 아주 살짝
     @Published var rimWidth: CGFloat = 1
-    @Published var rimSoftness: CGFloat = 1.5
+    @Published var rimSoftness: CGFloat = 1
     // 바깥 그림자
     @Published var shadowOpacity: CGFloat = 0.3
     @Published var shadowRadius: CGFloat = 28
@@ -85,16 +85,17 @@ final class DropTuning: ObservableObject {
     /// 바뀔 때마다 패널이 열기/닫기 모션을 한다. 마우스 위치(SiriDemo)나 설정창 버튼이 바꾼다.
     @Published var isOpen = false
 
-    /// 4차 설정(= 기본값): 2026-10-30 회사 맥에서 사용자가 맞춘 값. 3차에서 간격 11→10, 유리 붙는 거리 16→14,
-    /// 떨어지는 시간 0.75→0.55, 튕김 0.4→0.2. 조절하다가 이 값으로 되돌릴 때 쓴다.
-    func applyFourthPreset() {
+    /// 5차 설정(= 기본값): 2026-10-31 집 맥에서 사용자가 맞춘 값. 4차에서 검정 위로 35.5→75, 흐림 22.5→27.5,
+    /// 검정 반지름 60→33, 양옆 들임 −10→−5.5, 덧칠 0.5→0.65, 하단 영역 높이 56→58.5·여백 20→24, 테두리 흐림 1.5→1.
+    /// 조절하다가 이 값으로 되돌릴 때 쓴다.
+    func applyFifthPreset() {
         growWidth = 100; growHeight = 8; restWide = true; restWidth = 44; grownBottomRadius = 26; grownTopRadius = 12; popupHeight = 220
         popupRadius = 26; gap = 10; spacing = 14; grainHeight = 34; waitInset = 4
         inkDelay = 0; inkDuration = 0.65; inkNeck = true; clearGlass = true; tintOpacity = 0
-        lift = 35.5; softness = 22.5; blackRadius = 60; sideInset = -10; blackOpacity = 1; overBlack = 0.5
-        trayHeight = 56; trayMargin = 20; trayOpacity = 0.1; trayConcentric = true
+        lift = 75; softness = 27.5; blackRadius = 33; sideInset = -5.5; blackOpacity = 1; overBlack = 0.65
+        trayHeight = 58.5; trayMargin = 24; trayOpacity = 0.1; trayConcentric = true
         trayRadiusPlus = 4; trayDelay = -0.2; trayFade = 0.3; trayCapsule = true; popupBottomConcentric = true
-        rimOpacity = 0.05; rimWidth = 1; rimSoftness = 1.5; shadowOpacity = 0.3; shadowRadius = 28
+        rimOpacity = 0.05; rimWidth = 1; rimSoftness = 1; shadowOpacity = 0.3; shadowRadius = 28
         shadowY = 14.5; growDuration = 0.6
         growBounce = 0.2; dropDelay = -0.7; dropDuration = 0.55; dropBounce = 0.2; closeSpeed = 0.5
     }
@@ -585,7 +586,7 @@ struct DropControlView: View {
                 Button("닫기") { tuning.isOpen = false }
                 Button("다시 재생") { replay() }
                 Spacer()
-                Button("4차설정") { tuning.applyFourthPreset(); replay() }
+                Button("5차설정") { tuning.applyFifthPreset(); replay() }
                 Button("종료") { NSApp.terminate(nil) }
             }
             .padding(16)
