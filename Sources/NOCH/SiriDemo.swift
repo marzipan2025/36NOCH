@@ -55,7 +55,12 @@ final class DropTuning: ObservableObject {
     @Published var dropBounce: CGFloat = 0.4
     @Published var closeSpeed: CGFloat = 0.5         // 닫힘은 열림의 정확한 역재생. 이 값은 시간 배율(1 = 열 때와 같은 속도, 작을수록 빠름)
 
-    /// 버튼으로 바꾸는 값. 바뀔 때마다 패널이 열기/닫기 모션을 한다.
+    // 마우스
+    @Published var hoverMargin: CGFloat = 40         // 실제 노치 둘레 이만큼 안에 마우스가 오면 연다
+    @Published var keepMargin: CGFloat = 8           // 커진 노치+팝업 둘레 이만큼 밖으로 나가면 닫는다
+    @Published var holdWhileSettings = true          // 설정창이 떠 있는 동안은 마우스와 상관없이 펼친 채 유지
+
+    /// 바뀔 때마다 패널이 열기/닫기 모션을 한다. 마우스 위치(SiriDemo)나 설정창 버튼이 바꾼다.
     @Published var isOpen = false
 
     /// 2차 설정(= 기본값): 2026-10-30 회사 맥에서 사용자가 맞춘 값. 조절하다가 이 값으로 되돌릴 때 쓴다.
@@ -95,6 +100,7 @@ final class DropTuning: ObservableObject {
             ("textSize", textSize), ("textPadding", textPadding), ("textTop", textTop),
             ("growDuration", growDuration), ("growBounce", growBounce), ("dropDelay", dropDelay),
             ("dropDuration", dropDuration), ("dropBounce", dropBounce), ("closeSpeed", closeSpeed),
+            ("hoverMargin", hoverMargin), ("keepMargin", keepMargin),
         ]
         return pairs.map { String(format: "%@=%g", $0.0, Double($0.1)) }.joined(separator: " ")
     }
@@ -103,6 +109,7 @@ final class DropTuning: ObservableObject {
 @available(macOS 26.0, *)
 struct DropPanelView: View {
     let metrics: NotchMetrics
+    let onSettings: () -> Void
     @ObservedObject var tuning: DropTuning
 
     // 모션 단계: 노치가 커졌는지, 방울이 떨어졌는지
@@ -152,10 +159,29 @@ struct DropPanelView: View {
 
             // 커진 노치는 하드웨어 노치와 같은 검정
             notchShape.fill(.black)
+
+            settingsButton
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onChange(of: tuning.isOpen) { _, open in play(open: open) }
-        .onAppear { tuning.isOpen = true }
+    }
+
+    /// 설정 아이콘. 노치가 커지며 생긴 오른쪽 검정 영역(하드웨어 노치 오른쪽 끝 ~ 커진 노치 오른쪽 끝)의 한가운데.
+    private var settingsButton: some View {
+        let x = metrics.width / 2 + tuning.growWidth / 4
+        let y = (metrics.height + tuning.growHeight) / 2
+        return Button(action: onSettings) {
+            Image(systemName: "gearshape.fill")
+                .resizable()
+                .frame(width: 12, height: 12)
+                .foregroundStyle(Color(red: 0x66 / 255, green: 0x66 / 255, blue: 0x66 / 255))
+                .frame(width: 24, height: 24)   // 누르기 쉽게 누르는 영역만 넓힘
+                .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .offset(x: x, y: y - 12)
+        .opacity(grown ? 1 : 0)
+        .allowsHitTesting(grown)
     }
 
     /// 팝업과 그 유리 컨테이너. 검정 덮개 → 유리 → 글 순으로 쌓는다.
@@ -352,6 +378,11 @@ struct DropControlView: View {
                 }
                 Divider()
                 column {
+                    section("마우스")
+                    sliderRow("여는 거리(실제 노치 둘레)", $tuning.hoverMargin, 0...200)
+                    sliderRow("닫는 거리(노치+팝업 둘레)", $tuning.keepMargin, 0...80)
+                    Toggle("설정창이 떠 있으면 펼친 채 유지", isOn: $tuning.holdWhileSettings)
+
                     section("모션 (초)")
                     Text("열 때").font(.subheadline)
                     sliderRow("노치 커지는 시간", $tuning.growDuration, 0.05...2, step: 0.05)
@@ -454,32 +485,89 @@ struct DropControlView: View {
 final class SiriDemo {
     private var panel: NotchPanel?
     private var controlWindow: NSWindow?
+    private var metrics: NotchMetrics?
+    private var mouseTimer: Timer?
     private let tuning = DropTuning()
 
     func start(metrics: NotchMetrics) {
+        self.metrics = metrics
         // 슬라이더 최대값과 그림자가 잘리지 않게 넉넉하게 잡는다.
         let size = CGSize(width: 1000, height: 620)
         let panel = NotchPanel(frame: NotchPanel.topCenterFrame(on: metrics.screen, size: size))
         // 앱이 비활성이어도 활성 모양(유리)으로 그린다. 실제로 효과가 있는 건 NotchPanel의 비공개 메서드 덮어쓰기.
-        panel.contentView = NSHostingView(rootView: DropPanelView(metrics: metrics, tuning: tuning)
+        let root = DropPanelView(metrics: metrics, onSettings: { [weak self] in self?.toggleSettings() }, tuning: tuning)
             .environment(\.appearsActive, true)
-            .environment(\.controlActiveState, .key))
+            .environment(\.controlActiveState, .key)
+        panel.contentView = FirstClickHostingView(rootView: root)
         panel.forceActive = true
         panel.allowsKey = true
         panel.orderFrontRegardless()
         panel.makeKey()
         self.panel = panel
 
-        // 조절 창은 패널을 가리지 않게 오른쪽 아래에 둔다.
+        // 설정창은 처음엔 숨겨 두고, 노치의 설정 아이콘으로 연다. 패널을 가리지 않게 오른쪽 아래에 둔다.
         let control = makeControlWindow(title: "36NOCH 방울 팝업 조절", on: metrics.screen, below: 600,
                                         content: DropControlView(metrics: metrics, tuning: tuning))
         control.setFrameOrigin(CGPoint(x: metrics.screen.frame.maxX - control.frame.width - 20,
                                        y: metrics.screen.frame.minY + 20))
-        control.orderFrontRegardless()
         controlWindow = control
+
+        // 마우스 위치를 짧은 간격으로 확인한다. 전역 이벤트 감시와 달리 손쉬운 사용 권한이 필요 없다.
+        let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in
+            MainActor.assumeIsolated { self?.trackMouse() }
+        }
+        RunLoop.main.add(timer, forMode: .common)
+        mouseTimer = timer
+    }
+
+    private func toggleSettings() {
+        guard let control = controlWindow else { return }
+        if control.isVisible {
+            control.orderOut(nil)
+        } else {
+            control.orderFrontRegardless()
+        }
+    }
+
+    /// 닫혀 있을 때: 마우스가 실제 노치 근처에 오면 연다.
+    /// 열려 있을 때: 커진 노치 + 팝업 영역 안이면 유지, 벗어나면 닫는다.
+    private func trackMouse() {
+        guard let metrics, let panel else { return }
+        let mouse = NSEvent.mouseLocation
+        let sf = metrics.screen.frame
+        let t = tuning
+
+        let holding = t.holdWhileSettings && (controlWindow?.isVisible ?? false)
+        if !holding {
+            if t.isOpen {
+                if !keepRect(screen: sf, metrics: metrics).contains(mouse) { t.isOpen = false }
+            } else {
+                let notch = CGRect(x: sf.midX - metrics.width / 2, y: sf.maxY - metrics.height,
+                                   width: metrics.width, height: metrics.height)
+                // 위쪽은 화면 끝이라 여백이 필요 없지만, 끝에 붙은 마우스도 잡히게 위로도 넓힌다.
+                if notch.insetBy(dx: -t.hoverMargin, dy: -t.hoverMargin).contains(mouse) { t.isOpen = true }
+            }
+        }
+        // 열려 있을 때만 클릭을 받는다(설정 아이콘). 닫혀 있을 때는 아래 앱으로 통과.
+        panel.ignoresMouseEvents = !t.isOpen
+    }
+
+    /// 커진 노치와 팝업(간격 포함)을 감싸는 사각형, 화면 좌표
+    private func keepRect(screen sf: CGRect, metrics: NotchMetrics) -> CGRect {
+        let t = tuning
+        let width = metrics.width + t.growWidth
+        let height = metrics.height + t.growHeight + t.gap + t.popupHeight
+        return CGRect(x: sf.midX - width / 2, y: sf.maxY - height, width: width, height: height)
+            .insetBy(dx: -t.keepMargin, dy: -t.keepMargin)
     }
 
     func stop() {
+        mouseTimer?.invalidate()
         print(tuning.summary)
     }
+}
+
+/// 비활성 패널에서도 첫 클릭이 바로 버튼에 가게 한다.
+final class FirstClickHostingView<Content: View>: NSHostingView<Content> {
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
 }
