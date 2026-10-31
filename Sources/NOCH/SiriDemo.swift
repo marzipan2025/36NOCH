@@ -73,7 +73,7 @@ final class DropTuning: ObservableObject {
     // 다음 회의까지 남은 시간(Distro Mix, 금색). 너비를 고정하고, 글자 수가 줄면 그만큼 글자가 커져 아래로 늘어난다.
     let countdownWidth: CGFloat = 204     // 시계 너비. 204면 8자리(70:02:31)가 약 49pt
     let countdownGap: CGFloat = 12        // 숫자 아래 끝 ~ 제목 글자 위 끝
-    let countdownX: CGFloat = -8          // 남은 시간만 좌우로 옮기는 양(음수 = 왼쪽). −4에서 4 더 왼쪽
+    let countdownX: CGFloat = -9          // 남은 시간만 좌우로 옮기는 양(음수 = 왼쪽). −4 → −8 → −9
     let countdownLift: CGFloat = 0        // 더 끌어올리는 양. 0이면 숫자 위 끝 = 날짜 글자 위 끝
     // 모션(초)
     @Published var growDuration: CGFloat = 0.6
@@ -442,7 +442,7 @@ struct DropPanelView: View {
             Text(title)
                 .font(.system(size: titleSize, weight: .light))
                 .foregroundStyle(titleColor(color, hover: onTitle != nil && hoverTitle))
-                .offset(x: 1, y: 2)  // 좌우 여백 22에서 오른쪽으로 1(예전 −1에서 2 옮김), 아래로 2
+                .offset(x: 3, y: 2)  // 글 줄에서 오른쪽으로 3(−1 → 1 → 3), 아래로 2
                 .onHover { hoverTitle = $0 }
                 .onTapGesture { onTitle?() }
         }
