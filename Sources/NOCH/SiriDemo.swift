@@ -63,7 +63,8 @@ final class DropTuning: ObservableObject {
     let textSize: CGFloat = 11
     let textPadding: CGFloat = 22
     let textTop: CGFloat = 30                // 팝업 위 끝 ~ 시계·글 위 끝(2026-10-31 18 → 38(팝업 높이도 20 늘림) → 30)
-    let popupSideExtra: CGFloat = 12         // 시계·글·하단 영역은 그대로 두고 팝업만 좌우로 더 넓힌 양(한쪽). 그만큼 안쪽 여백이 는다
+    let popupSideExtra: CGFloat = 27         // 시계·글·하단 영역은 그대로 두고 노치만 좌우로 더 넓힌 양(한쪽). 그만큼 안쪽 여백이 는다(12 → 27: 전체 30 넓힘)
+    let clockGap: CGFloat = 4                // 실제 노치 아래 끝 ~ 시계 숫자 위 끝
     // 팝업이 커진 노치보다 넓은 양(양쪽 합). 커진 노치를 줄일 때(너비 + 100 → 92 → 80) 팝업 너비는 그대로 두려고
     // 줄인 만큼(8, 12) 24에 더함
     var popupExtraWidth: CGFloat { 44 + popupSideExtra * 2 }
@@ -194,14 +195,17 @@ struct DropPanelView: View {
     private var notchHeight: CGFloat { metrics.height + (grown ? tuning.growHeight : 0) }
 
 
-    /// 커진 노치에서 예전 팝업이 시작하던 높이(화면 위 끝에서). 글·하단 영역은 이 아래에 예전 팝업과 같은 자리로 놓인다.
-    private var bodyTop: CGFloat { metrics.height + tuning.growHeight + tuning.gap }
+    /// 노치 모양을 그리는 틀 너비. 위 두 모서리는 화면 위 끝에서 바깥으로 오목하게 퍼지므로(위 반지름만큼)
+    /// 틀이 모양 너비와 같으면 그 곡선이 잘린다. 양쪽으로 위 반지름만큼 넓힌다.
+    private var shapeFrameWidth: CGFloat {
+        popupSize.width + 2 * max(tuning.grownTopRadius, NotchMetrics.topRadius) + 2
+    }
 
     /// 노치 전체(닫힘 = 실제 노치 + 좌우로 늘여 둔 만큼, 열림 = 예전 팝업 너비 × 화면 위 끝~예전 팝업 아래 끝).
     /// 이름은 예전 그대로 popupSize·popupShape를 쓴다. popupTop은 늘 0(화면 위 끝).
     private var popupSize: CGSize {
         grown ? CGSize(width: metrics.width + tuning.growWidth + tuning.popupExtraWidth,
-                       height: bodyTop + tuning.popupHeight(calendar: calendar, metrics: metrics))
+                       height: tuning.notchBodyHeight(calendar: calendar, metrics: metrics))
               : CGSize(width: notchWidth, height: metrics.height)
     }
     private var popupTop: CGFloat { 0 }
@@ -243,14 +247,14 @@ struct DropPanelView: View {
             // 가장자리에서는 유리의 렌즈 효과로 검정이 모서리를 따라 휜다. (위에 덮으면 매트한 평면이 된다)
             popupLayers
 
-            // 위쪽 띠(하드웨어 노치 + 커진 높이 + 간격)는 하드웨어 노치와 같은 검정. 그 아래 60에 걸쳐 옅어져
+            // 위쪽 띠(실제 노치 높이)는 하드웨어 노치와 같은 검정. 그 아래 60에 걸쳐 옅어져
             // 검정 덮개(흐린 경계)로 이어진다. 닫히면 모양 전체가 이 띠 안이라 온통 검정.
             popupShape.fill(.black)
-                .frame(width: popupSize.width, height: popupSize.height)
+                .frame(width: shapeFrameWidth, height: popupSize.height)
                 .mask {
                     LinearGradient(stops: [.init(color: .black, location: 0),
-                                           .init(color: .black, location: bodyTop / max(popupSize.height, 1)),
-                                           .init(color: .clear, location: min(1, (bodyTop + 60) / max(popupSize.height, 1)))],
+                                           .init(color: .black, location: metrics.height / max(popupSize.height, 1)),
+                                           .init(color: .clear, location: min(1, (metrics.height + 60) / max(popupSize.height, 1)))],
                                    startPoint: .top, endPoint: .bottom)
                 }
 
@@ -326,7 +330,7 @@ struct DropPanelView: View {
 
             // 유리는 노치 전체 모양 하나. 위쪽은 검정에 덮이고 아래쪽만 유리로 보인다.
             Color.clear
-                .frame(width: popupSize.width, height: popupSize.height)
+                .frame(width: shapeFrameWidth, height: popupSize.height)
                 .glassEffect(glass, in: popupShape)
 
             // 덧칠: 유리 아래 검정만으로는 유리가 빛을 더해 덜 검게 보인다. 같은 모양을 유리 위에 반투명으로 한 번 더.
@@ -335,7 +339,7 @@ struct DropPanelView: View {
 
             // 온통 검정: 노치와 같은 검정으로 커졌다가 걷혀 아래쪽 유리가 드러난다.
             popupShape.fill(.black)
-                .frame(width: popupSize.width, height: popupSize.height)
+                .frame(width: shapeFrameWidth, height: popupSize.height)
                 .offset(y: popupTop)
                 .opacity(inked ? 1 : 0)
 
@@ -353,7 +357,7 @@ struct DropPanelView: View {
                     AccountPicker(calendar: calendar, textSize: tuning.textSize,
                                   onLater: { calendar.later(); tuning.isOpen = false })
                         // 계정마다 검정 상자에 담기므로 아래 투명한 유리까지 내려가도 된다. 아래 여백은 18.
-                        .frame(height: max(0, popupSize.height - bodyTop - tuning.textTop - 18))
+                        .frame(height: max(0, popupSize.height - tuning.contentTop(metrics: metrics) - 18))
                 } else {
                 TimelineView(.periodic(from: Date(timeIntervalSinceReferenceDate: Date().timeIntervalSinceReferenceDate.rounded(.down)), by: 0.5)) { context in
                     let now = context.date
@@ -394,7 +398,7 @@ struct DropPanelView: View {
                     .font(.system(size: tuning.textSize, weight: .light))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, tuning.textPadding + tuning.popupSideExtra)
-                    .padding(.top, bodyTop + tuning.textTop)
+                    .padding(.top, tuning.contentTop(metrics: metrics))
                     .opacity(dropped ? 1 : 0)
             }
             .frame(width: popupSize.width, height: popupSize.height, alignment: .topLeading)
@@ -508,7 +512,7 @@ struct DropPanelView: View {
     /// 바깥 그림자만 남긴다. 그림자를 만드는 모양 자체는 오려 내서 투명한 유리 안이 어두워지지 않게 한다.
     private var shadowLayer: some View {
         let shapes = popupShape.fill(.black)
-            .frame(width: popupSize.width, height: popupSize.height)
+            .frame(width: shapeFrameWidth, height: popupSize.height)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
         return shapes
@@ -944,7 +948,7 @@ final class SiriDemo: NSObject {
     private func keepRect(screen sf: CGRect, metrics: NotchMetrics, margin: CGFloat) -> CGRect {
         let t = tuning
         let width = metrics.width + t.growWidth + t.popupExtraWidth  // 팝업이 커진 노치보다 넓다
-        let height = metrics.height + t.growHeight + t.gap + t.popupHeight(calendar: calendar, metrics: metrics)
+        let height = t.notchBodyHeight(calendar: calendar, metrics: metrics)
         return CGRect(x: sf.midX - width / 2, y: sf.maxY - height, width: width, height: height)
             .insetBy(dx: -margin, dy: -margin)
     }
@@ -976,6 +980,19 @@ extension SiriDemo: NSMenuDelegate {
 }
 
 extension DropTuning {
+    /// 커진 노치 안에서 글 틀의 위 끝(화면 위 끝에서). 시계 숫자 위 끝 = 날짜 글자 위 끝 = 실제 노치 아래 + clockGap.
+    func contentTop(metrics: NotchMetrics) -> CGFloat {
+        let small = NSFont.systemFont(ofSize: textSize, weight: .light)
+        return metrics.height + clockGap - (small.ascender - small.capHeight)
+    }
+
+    /// 커진 노치 전체 높이(화면 위 끝 ~ 아래 끝). 예전 팝업 내용(popupHeight, 위 여백 textTop 포함)을
+    /// 글 틀 위 끝(contentTop)에 맞춰 올려 놓은 높이.
+    @MainActor
+    func notchBodyHeight(calendar: CalendarFeed, metrics: NotchMetrics) -> CGFloat {
+        contentTop(metrics: metrics) + popupHeight(calendar: calendar, metrics: metrics) - textTop
+    }
+
     /// 지금 팝업 높이. 캘린더 계정을 고르는 동안은 목록이 다 들어가게 늘린다(아래 여백 18).
     /// 다만 화면 높이의 절반, 그리고 노치 패널(620) 안에 그림자까지 들어가는 높이를 넘지 않는다. 넘치면 목록이 스크롤된다.
     @MainActor
