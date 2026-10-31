@@ -11,7 +11,7 @@ import SwiftUI
 
 import Combine
 
-/// 모든 조절 값. 기본값은 2026-10-31 사용자가 맞춘 10차 설정.
+/// 모든 조절 값. 기본값은 2026-10-31 사용자가 맞춘 11차 설정.
 /// 바꾼 값은 UserDefaults에 저장해서 앱을 다시 켜도 이어진다.
 final class DropTuning: ObservableObject {
     // 노치 확장
@@ -43,7 +43,7 @@ final class DropTuning: ObservableObject {
     @Published var overBlack: CGFloat = 0.65          // 같은 검정 모양을 유리 "위"에도 이만큼 덧칠. 유리가 검정을 밝혀 보이게 하는 만큼 다시 어둡게
     // 하단 영역: 팝업 아래쪽 안에 둔 흰 반투명 면. 이 안에는 검정이 들어오지 않는다.
     @Published var trayHeight: CGFloat = 48
-    @Published var trayMargin: CGFloat = 31.5          // 좌우·아래 여백
+    @Published var trayMargin: CGFloat = 36          // 좌우·아래 여백
     @Published var trayOpacity: CGFloat = 0.1        // 흰색 불투명도
     @Published var trayConcentric = true             // 켜면 모서리 = 팝업 모서리 − 여백(같은 중심의 곡선), 끄면 팝업과 같은 반지름
     @Published var trayRadiusPlus: CGFloat = 4       // 위 규칙으로 정한 모서리에 더하는 값
@@ -64,8 +64,9 @@ final class DropTuning: ObservableObject {
     let textPadding: CGFloat = 22
     let textTop: CGFloat = 30                // 팝업 위 끝 ~ 시계·글 위 끝(2026-10-31 18 → 38(팝업 높이도 20 늘림) → 30)
     let popupSideExtra: CGFloat = 33         // 커진 노치를 좌우로 더 넓힌 양(한쪽). 12 → 27(전체 30) → 57(전체 60 더) → 41(전체 32 줄임) → 37 → 33(8씩 두 번 더 줄임)
-    /// 글·아이콘 좌우 끝을 하단 캡슐 좌우 끝(노치 끝에서 trayMargin)에 맞추려고 textPadding에 더하는 안쪽 여백(한쪽)
-    var uiSideInset: CGFloat { trayMargin - textPadding }
+    /// 글·아이콘 좌우 끝을 하단 캡슐 좌우 끝(노치 끝에서 trayMargin)보다 uiInsideCapsule만큼 안쪽에 두려고 textPadding에 더하는 여백(한쪽)
+    let uiInsideCapsule: CGFloat = 3
+    var uiSideInset: CGFloat { trayMargin - textPadding + uiInsideCapsule }
     let clockGap: CGFloat = 10               // 실제 노치 아래 끝 ~ 시계 숫자 위 끝(4에서 6 내림)
     // 팝업이 커진 노치보다 넓은 양(양쪽 합). 커진 노치를 줄일 때(너비 + 100 → 92 → 80) 팝업 너비는 그대로 두려고
     // 줄인 만큼(8, 12) 24에 더함
@@ -92,27 +93,18 @@ final class DropTuning: ObservableObject {
     /// 바뀔 때마다 패널이 열기/닫기 모션을 한다. 마우스 위치(SiriDemo)나 설정창 버튼이 바꾼다.
     @Published var isOpen = false
 
-    /// 9차 설정: 2026-10-31 집 맥. 8차(7차에 팝업 높이 240, 커진 노치 너비 + 80, 노치와 간격 14)에서
-    /// 커진 노치 아래 모서리 26→16. 조절하다가 이 값으로 되돌릴 때 쓴다.
-    func applyNinthPreset() {
-        growWidth = 80; growHeight = 12; restWide = true; restWidth = 44; grownBottomRadius = 16; grownTopRadius = 12; popupHeight = 240
+    /// 11차 설정(= 기본값): 2026-10-31 집 맥. 10차에서 하단 캡슐 좌우·아래 여백 31.5 → 36.
+    /// 조절하다가 이 값으로 되돌릴 때 쓴다.
+    func applyEleventhPreset() {
+        growWidth = 80; growHeight = 12; restWide = true; restWidth = 44; grownBottomRadius = 16; grownTopRadius = 21.5; popupHeight = 232
         popupRadius = 26; gap = 14; spacing = 12; grainHeight = 34; waitInset = 4
-        inkDelay = 0; inkDuration = 0.65; inkNeck = true; clearGlass = true; tintOpacity = 0
-        lift = 96; softness = 28.5; blackRadius = 60; sideInset = -5.5; blackOpacity = 1; overBlack = 0.65
-        trayHeight = 58.5; trayMargin = 24; trayOpacity = 0.1; trayConcentric = true
+        inkDelay = 0; inkDuration = 0.65; inkNeck = true; clearGlass = true; tintOpacity = 0.05
+        lift = 65.5; softness = 37; blackRadius = 44; sideInset = -1; blackOpacity = 1; overBlack = 0.65
+        trayHeight = 48; trayMargin = 36; trayOpacity = 0.1; trayConcentric = true
         trayRadiusPlus = 4; trayDelay = -0.2; trayFade = 0.3; trayCapsule = true; popupBottomConcentric = true
         rimOpacity = 0.05; rimWidth = 1; rimSoftness = 1; shadowOpacity = 0.3; shadowRadius = 28
         shadowY = 14.5; growDuration = 0.6
         growBounce = 0.2; dropDelay = -0.7; dropDuration = 0.55; dropBounce = 0.2; closeSpeed = 0.5
-    }
-
-    /// 10차 설정(= 기본값): 2026-10-31 집 맥. 9차에서 위 모서리 21.5, 팝업 높이 232, 검정 덮개(lift 65.5, 흐림 37, 모서리 44, 들임 −1),
-    /// 틴트 0.05, 하단 캡슐 높이 48·여백 31.5.
-    func applyTenthPreset() {
-        applyNinthPreset()
-        grownTopRadius = 21.5; popupHeight = 232; tintOpacity = 0.05
-        lift = 65.5; softness = 37; blackRadius = 44; sideInset = -1
-        trayHeight = 48; trayMargin = 31.5
     }
 
     // MARK: 저장
@@ -411,7 +403,7 @@ struct DropPanelView: View {
                 } }
                     .font(.system(size: tuning.textSize, weight: .light))
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, tuning.textPadding + tuning.uiSideInset)  // 노치 좌우 끝에서 trayMargin(= 하단 캡슐 좌우 끝)
+                    .padding(.horizontal, tuning.textPadding + tuning.uiSideInset)  // 노치 좌우 끝에서 trayMargin + 3(하단 캡슐 좌우 끝보다 3 안쪽)
                     .padding(.top, tuning.contentTop(metrics: metrics))
                     .opacity(dropped ? 1 : 0)
             }
@@ -624,8 +616,7 @@ struct DropControlView: View {
                 Button("닫기") { tuning.isOpen = false }
                 Button("다시 재생") { replay() }
                 Spacer()
-                Button("9차설정") { tuning.applyNinthPreset(); replay() }
-                Button("10차설정") { tuning.applyTenthPreset(); replay() }
+                Button("11차설정") { tuning.applyEleventhPreset(); replay() }
                 Button("종료") { NSApp.terminate(nil) }
             }
             .padding(16)
