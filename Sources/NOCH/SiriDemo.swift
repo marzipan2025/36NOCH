@@ -797,6 +797,12 @@ final class SiriDemo: NSObject {
         RunLoop.main.add(timer, forMode: .common)
         mouseTimer = timer
 
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.closeForSpaceChange() }
+        }
+
         setUpStatusItem()
     }
 
@@ -883,7 +889,10 @@ final class SiriDemo: NSObject {
         // 회의 알림도 마찬가지로 마우스와 상관없이 펼친 채 유지한다.
         // 팝업에서 캘린더 계정을 고르는 동안도 열어 둔다(고를 계정이 있을 때만. 권한 거부·계정 없음은 안내 글만이라 붙들지 않는다).
         let choosing = calendar.picking && calendar.status != .denied && !calendar.accounts.isEmpty
-        let alerting = meetingAlert() || GoHome.isTime(Date(), seconds: GoHome.seconds) || choosing
+        var alerting = meetingAlert() || GoHome.isTime(Date(), seconds: GoHome.seconds) || choosing
+        // 데스크탑을 바꿔 닫은 알림은 그 알림이 끝날 때까지 다시 열지 않는다
+        if !alerting { alertMuted = false }
+        if alertMuted { alerting = false }
         if alerting && !t.isOpen { t.isOpen = true }
         let holding = alerting || (t.holdWhileSettings && (controlWindow?.isVisible ?? false))
         if !holding {
@@ -897,7 +906,9 @@ final class SiriDemo: NSObject {
                 let hover = CGRect(x: notch.minX - t.hoverMargin, y: notch.minY - t.hoverDown,
                                    width: notch.width + t.hoverMargin * 2,
                                    height: notch.height + t.hoverDown + t.hoverMargin)
-                if hover.contains(mouse) { t.isOpen = true }
+                // 데스크탑을 바꿔 닫은 뒤에는 마우스가 한 번 노치 밖으로 나갔다 와야 다시 연다
+                if !hover.contains(mouse) { reopenBlocked = false }
+                if hover.contains(mouse) && !reopenBlocked { t.isOpen = true }
             }
         }
         // 열려 있고 마우스가 노치+팝업 위에 있을 때만 클릭을 받는다(설정 아이콘).
@@ -907,6 +918,20 @@ final class SiriDemo: NSObject {
     }
 
     private var alertUntil = Date.distantPast
+    /// 데스크탑을 바꿔 닫았을 때: 진행 중인 알림은 끝날 때까지 붙들지 않고(alertMuted),
+    /// 마우스가 노치 위에 있었으면 한 번 벗어날 때까지 다시 열지 않는다(reopenBlocked)
+    private var alertMuted = false
+    private var reopenBlocked = false
+
+    /// 데스크탑(스페이스)이 바뀌면 설정창을 닫고 노치도 닫힘 모션으로 닫는다. 계정 고르기 중이면 "Choose later"와 같게 처리.
+    /// macOS 공식 알림이라 권한이 필요 없지만, 전환이 거의 끝난 뒤에 온다(스와이프 30% 같은 중간 시점은 알 수 없음).
+    private func closeForSpaceChange() {
+        controlWindow?.orderOut(nil)
+        if calendar.picking { calendar.later() }
+        alertMuted = true
+        reopenBlocked = true
+        tuning.isOpen = false
+    }
     private var alertedTen: String?
     private var reloadedAfter: String?
 
