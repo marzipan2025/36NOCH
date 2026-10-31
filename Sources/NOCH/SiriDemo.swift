@@ -388,7 +388,7 @@ struct DropPanelView: View {
                                         color: clockColor(alert: alert, left: left),
                                         clockVisible: !blinking || Int(now.timeIntervalSinceReferenceDate * 2) % 2 == 0,
                                         colonBlink: left > 0 && left < 100 * 3600, now: now,
-                                        width: clockWidth(for: text, right: calendar.nextWhen),
+                                        width: clockWidth(for: text),
                                         onTitle: openCalendarApp)
                         } else {
                             Text(calendar.summary)
@@ -397,7 +397,7 @@ struct DropPanelView: View {
                                     if calendar.status == .noAccount || calendar.status == .denied { calendar.startPicking() }
                                 }
                         }
-                        Spacer(minLength: 0)  // HH:MM:SS는 오른쪽 글 12 앞까지 넓히므로 최소 간격은 clockWidth가 지킨다
+                        Spacer(minLength: 0)  // HH:MM:SS는 너비가 정해져 있어 최소 간격은 clockWidth가 정한다
                         if let when = home ? GoHome.when(now) : calendar.nextWhen {
                             Text(when.day + "\n" + when.time).multilineTextAlignment(.trailing).fixedSize()
                                 .foregroundStyle(Color(red: 0xcc / 255, green: 0xcc / 255, blue: 0xdd / 255))  // #ccccdd
@@ -449,15 +449,15 @@ struct DropPanelView: View {
         .padding(.top, smallCapTop - size * ClockFont.capTop - tuning.countdownLift)
     }
 
-    /// 시계 너비. HH:MM:SS(콜론 둘)는 글 줄 왼쪽에서 오른쪽 날짜·시각 글 12 앞까지 꽉 채운다.
-    /// 시계는 countdownX(음수)만큼 왼쪽으로 밀려 그려지므로 그만큼 더 넓힌다. 그 밖(MM:SS 등)은 countdownWidth.
-    private func clockWidth(for text: String, right: (day: String, time: String)?) -> CGFloat {
+    /// 시계 너비. HH:MM:SS(콜론 둘)는 날짜와 상관없이 고정: 글 줄 너비에서 68을 뺀 너비.
+    /// 68 = "Sat, Oct 31" 너비(57) + 간격 12 + countdownX(−9, 왼쪽으로 밀려 그려지는 만큼) + 8.
+    /// 2026-10-31에 날짜 글 12 앞까지 채우던 271에서 8 줄인 263(노치 409 기준).
+    /// 칸 끝 기준 오른쪽 글과의 간격은 가장 넓은 날짜(Wed, May 30) 9.5 ~ 가장 좁은 날짜(Fri, Jul 7) 33.
+    /// 그 밖(MM:SS 등)은 countdownWidth.
+    private func clockWidth(for text: String) -> CGFloat {
         guard text.filter({ $0 == ":" }).count == 2 else { return tuning.countdownWidth }
-        let font = NSFont.systemFont(ofSize: tuning.textSize, weight: .light)
-        let rightWidth = [right?.day ?? "", right?.time ?? ""]
-            .map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
         let content = popupSize.width - 2 * (tuning.textPadding + tuning.uiSideInset)
-        return content - ceil(rightWidth) - 12 - tuning.countdownX
+        return content - 68
     }
 
     /// 시계 색: 알림 중 #ff3b30, 1시간 이상 남음(HH:MM:SS) #686B88, 그 밖에 금색 #ffd700
