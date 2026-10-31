@@ -24,11 +24,12 @@ final class CalendarFeed: ObservableObject {
         var showURL: URL? = nil
     }
 
-    /// 캘린더 앱이 받는 비공개 주소 ical://ekevent/<외부 ID>?method=show&options=more 로 일정을 연다.
-    /// 반복 일정은 외부 ID 앞에 이번 회차 시작(UTC, yyyyMMdd'T'HHmmss'Z')을 붙여야 그 회차가 열린다.
+    /// 캘린더 앱이 받는 비공개 주소 ical://ekevent/<일정 ID>?method=show&options=more 로 일정을 연다.
+    /// 반복 일정은 일정 ID 앞에 이번 회차 시작(UTC, yyyyMMdd'T'HHmmss'Z')을 붙여야 그 회차가 열린다.
     static func showURL(for event: EKEvent) -> URL? {
-        guard let ext = event.calendarItemExternalIdentifier,
-              let id = ext.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(["/"])) else { return nil }
+        // 외부 ID(calendarItemExternalIdentifier)로는 열리지 않는 일정이 있다(구글 일정 [ IRINE ] Dechi: 캘린더가 그대로 있음).
+        // 이 맥의 일정 ID(calendarItemIdentifier)로는 열린다(2026-10-31 확인).
+        guard let id = event.calendarItemIdentifier.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(["/"])) else { return nil }
         var path = id
         if event.hasRecurrenceRules, let start = event.startDate {
             let f = DateFormatter()
