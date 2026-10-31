@@ -247,17 +247,6 @@ struct DropPanelView: View {
             // 가장자리에서는 유리의 렌즈 효과로 검정이 모서리를 따라 휜다. (위에 덮으면 매트한 평면이 된다)
             popupLayers
 
-            // 위쪽 띠(실제 노치 높이)는 하드웨어 노치와 같은 검정. 그 아래 60에 걸쳐 옅어져
-            // 검정 덮개(흐린 경계)로 이어진다. 닫히면 모양 전체가 이 띠 안이라 온통 검정.
-            popupShape.fill(.black)
-                .frame(width: shapeFrameWidth, height: popupSize.height)
-                .mask {
-                    LinearGradient(stops: [.init(color: .black, location: 0),
-                                           .init(color: .black, location: metrics.height / max(popupSize.height, 1)),
-                                           .init(color: .clear, location: min(1, (metrics.height + 60) / max(popupSize.height, 1)))],
-                                   startPoint: .top, endPoint: .bottom)
-                }
-
             notchButtons
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
@@ -277,10 +266,10 @@ struct DropPanelView: View {
 
     private var notchButtons: some View {
         let d: CGFloat = 14
-        // 닫힌 노치 끝에서 열린 노치 끝까지 한쪽이 넓어지는 양
-        let spread = grown ? (tuning.growWidth - (tuning.restWide ? tuning.restWidth : 0)) / 2 : 0
-        // 열렸을 때는 높이 가운데에서 안쪽으로 5, 위로 4 옮긴다
-        let x = metrics.width / 2 + d / 2 + spread - (grown ? 5 : 0)
+        // 닫혀 있으면 실제 노치 좌우 끝 바로 바깥, 열리면 아이콘 바깥 끝을 글 좌우 끝(노치 끝에서 textPadding)에 맞춘다.
+        // 높이는 노치 가운데에서 열리면 위로 4.
+        let x = grown ? popupSize.width / 2 - tuning.textPadding - d / 2
+                      : metrics.width / 2 + d / 2
         let y = notchHeight / 2 - d / 2 - (grown ? 4 : 0)
         let color = grown ? Color(red: 0x24 / 255, green: 0x25 / 255, blue: 0x2F / 255)
                           : Color(red: 0x18 / 255, green: 0x18 / 255, blue: 0x18 / 255)
@@ -343,6 +332,18 @@ struct DropPanelView: View {
                 .offset(y: popupTop)
                 .opacity(inked ? 1 : 0)
 
+            // 위쪽 띠(실제 노치 높이)는 하드웨어 노치와 같은 검정. 그 아래 60에 걸쳐 옅어져
+            // 검정 덮개(흐린 경계)로 이어진다. 닫히면 모양 전체가 이 띠 안이라 온통 검정.
+            popupShape.fill(.black)
+                .frame(width: shapeFrameWidth, height: popupSize.height)
+                .mask {
+                    LinearGradient(stops: [.init(color: .black, location: 0),
+                                           .init(color: .black, location: metrics.height / max(popupSize.height, 1)),
+                                           .init(color: .clear, location: min(1, (metrics.height + 60) / max(popupSize.height, 1)))],
+                                   startPoint: .top, endPoint: .bottom)
+                }
+            // (글보다 아래에 깐다. 위에 덮으면 시계·글 윗부분이 검정에 가려 어두워진다)
+
             // 유리 위에 얹는 것: 하단 영역, 테두리 빛, 글
             ZStack(alignment: .topLeading) {
                 // 계정을 고르는 동안은 하단 캡슐(흰 곳)을 없앤다.
@@ -397,7 +398,7 @@ struct DropPanelView: View {
                 } }
                     .font(.system(size: tuning.textSize, weight: .light))
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, tuning.textPadding + tuning.popupSideExtra)
+                    .padding(.horizontal, tuning.textPadding)  // 노치 좌우 끝에서 22. 넓어진 너비에 맞춰 시계는 왼쪽, 날짜는 오른쪽으로
                     .padding(.top, tuning.contentTop(metrics: metrics))
                     .opacity(dropped ? 1 : 0)
             }
@@ -477,8 +478,8 @@ struct DropPanelView: View {
         let margin = tuning.trayMargin
         return RoundedRectangle(cornerRadius: trayRadius)
             .fill(style)
-            // 좌우 여백에는 팝업만 넓힌 양(popupSideExtra)을 더해 하단 영역 크기·위치는 그대로
-            .frame(width: max(0, popupSize.width - (margin + tuning.popupSideExtra) * 2), height: tuning.trayHeight)
+            // 노치 너비에 맞춰 좌우 여백만 두고 넓힌다
+            .frame(width: max(0, popupSize.width - margin * 2), height: tuning.trayHeight)
             .padding(.bottom, margin)
             .frame(width: popupSize.width, height: popupSize.height, alignment: .bottom)
     }
