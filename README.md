@@ -39,7 +39,7 @@ NotchNook(lo.cafe) 같은 완성품이 이미 있으므로, **NotchNook이 못 �
 2. `./build-app.sh` → `build/36NOCH.app`
 3. `ditto -c -k --keepParent build/36NOCH.app build/36NOCH-<버전>.zip`
 4. 커밋·푸시 후 `gh release create v<버전> build/36NOCH-<버전>.zip`
-5. 다른 맥: 앱이 스스로 업데이트한다(아래). 처음 설치할 때만 릴리스에서 zip을 받아 풀고 `/Applications`에 복사. 처음 열 때 Gatekeeper 경고가 뜨면 우클릭 → 열기. 캘린더 권한은 맥마다 한 번 허용.
+5. 다른 맥: 앱이 스스로 업데이트한다(아래). 처음 설치할 때만 릴리스에서 zip을 받아 풀고 `/Applications`에 복사. 처음 열 때 Gatekeeper 경고가 뜨면 우클릭 → 열기. 캘린더 권한은 맥마다 한 번 허용. 데스크탑을 트랙패드로 넘기기 전에 노치를 닫으려면 "입력 모니터링"도 한 번 허용(시스템 설정 > 개인정보 보호 및 보안 > 입력 모니터링 > 36NOCH, 허용 뒤 5초 안에 적용).
 
 zip은 릴리스에 하나만 올린다(앱이 `.zip`으로 끝나는 첫 첨부를 받는다). 태그는 `v<버전>`.
 

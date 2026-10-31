@@ -814,6 +814,11 @@ final class SiriDemo: NSObject {
         ) { [weak self] _ in
             MainActor.assumeIsolated { self?.closeForSpaceChange() }
         }
+        // 트랙패드 스와이프로 옆 데스크탑이 30% 들어오면 넘어가기 전에 닫는다(입력 모니터링 권한 필요).
+        // 위 공식 알림은 키보드·Mission Control로 바꿀 때와, 이 방법이 안 될 때를 맡는다.
+        let swipe = SpaceSwipeWatcher { [weak self] in self?.closeForSpaceChange() }
+        swipe.start()
+        spaceSwipe = swipe
 
         setUpStatusItem()
     }
@@ -933,6 +938,7 @@ final class SiriDemo: NSObject {
     /// 데스크탑을 바꿔 닫았을 때: 진행 중인 알림은 끝날 때까지 붙들지 않고(alertMuted),
     /// 마우스가 노치 위에 있었으면 한 번 벗어날 때까지 다시 열지 않는다(reopenBlocked)
     private var alertMuted = false
+    private var spaceSwipe: SpaceSwipeWatcher?
     private var reopenBlocked = false
 
     /// 데스크탑(스페이스)이 바뀌면 설정창을 닫고 노치도 닫힘 모션으로 닫는다. 계정 고르기 중이면 "Choose later"와 같게 처리.

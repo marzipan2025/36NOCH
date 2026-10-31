@@ -227,6 +227,14 @@ macOS 12+의 `NSScreen` API:
 
 ---
 
+### 3.7 데스크탑을 넘길 때 닫기 (2026-11-01)
+
+- 공식: `NSWorkspace.activeSpaceDidChangeNotification`. 권한 없이 키보드·트랙패드·Mission Control 모두 잡지만 전환이 거의 끝난 뒤에 온다.
+- 넘어가기 전(옆 데스크탑 30%)에 닫으려고 Dock이 받는 스와이프 이벤트를 듣기 전용 이벤트 탭으로 읽는다(`SpaceSwipe.swift`).
+  비공개 이벤트 종류 30(kCGSEventDockControl), 필드 110 = 23(DockSwipe), 123 = 방향(1 좌우), 124 = 진행(한 화면 ±1), 132 = 단계(1 시작·2 진행·4 끝·8 취소).
+  Mac Mouse Fix 등이 역공학으로 쓰는 번호라 macOS가 바뀌면 안 될 수 있다. `--log-swipe`로 띄우면 받은 값을 찍는다.
+- "입력 모니터링" 권한이 필요하다. 터미널에서 실행 파일을 바로 띄우면 권한이 터미널(부모 앱) 몫이 되니 `open`으로 띄워 시험한다.
+
 ## 4. 출처
 
 - AppleInsider, macOS 27 Golden Gate: https://appleinsider.com/articles/26/06/08/macos-27-golden-gate-delivers-more-liquid-glass-and-updated-siri
