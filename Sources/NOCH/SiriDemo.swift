@@ -194,8 +194,8 @@ struct DropPanelView: View {
     // 노치가 커질 때 모서리도 함께 커진다(NotchShape가 반지름까지 애니메이션).
     private var notchShape: NotchShape {
         NotchShape(width: notchWidth, height: notchHeight,
-                   // 닫힌 노치(좌우로 늘여 둔 검정)의 아래 모서리는 실제 노치(10)보다 2 크게 — 같으면 더 작아 보였다
-                   bottomRadius: grown ? tuning.grownBottomRadius : NotchMetrics.bottomRadius + 2,
+                   // 닫힌 노치(좌우로 늘여 둔 검정)의 아래 모서리는 실제 노치(10)보다 4 크게(14) — 같으면 더 작아 보였다
+                   bottomRadius: grown ? tuning.grownBottomRadius : NotchMetrics.bottomRadius + 4,
                    topRadius: grown ? tuning.grownTopRadius : NotchMetrics.topRadius)
     }
 
