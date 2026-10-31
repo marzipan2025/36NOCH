@@ -342,16 +342,18 @@ struct DropPanelView: View {
                     let now = context.date
                     // 퇴근 알림은 닫힘 모션이 끝날 때까지(10초 + 2초) 그대로 보여 준다
                     let home = GoHome.isTime(now, seconds: GoHome.seconds + 2)
+                    // now 버튼에 마우스가 있거나 눌러서 잠근 동안: 시계·날짜를 지금 시각(하늘색)으로. 잠근 동안엔 아래에 "NOCH Locked."
+                    let showNow = hoverNow || tuning.locked
                     HStack(alignment: .top) {
-                        if hoverNow {
-                            // "지금" 버튼 롤오버: 시계 자리에 지금 시각(HH:MM:SS)을 퇴근 알림과 같은 하늘색으로, 아래 제목은 없음
+                        if showNow {
+                            // "지금" 버튼 롤오버(또는 눌러서 잠근 동안): 시계 자리에 지금 시각(HH:MM:SS)을 퇴근 알림과 같은 하늘색으로, 아래 제목은 없음
                             let text = Self.nowClock(now)
                             clockColumn(text: text, title: tuning.locked ? Self.lockedTitle : "", color: Self.sky, colonBlink: true, now: now,
                                         width: clockWidth(for: text))
                         } else if home {
                             // 평일 18시: "18:00"을 하늘색으로, 열려 있는 10초 동안 회의 시작 00:00처럼 깜빡인다
                             let blinking = GoHome.isTime(now, seconds: GoHome.seconds)
-                            clockColumn(text: GoHome.clock, title: tuning.locked ? Self.lockedTitle : "Go home Now!", color: Self.sky,
+                            clockColumn(text: GoHome.clock, title: "Go home Now!", color: Self.sky,
                                         clockVisible: !blinking || Int(now.timeIntervalSinceReferenceDate * 2) % 2 == 0)
                         } else if let next = calendar.next {
                             // 임시: 다음 회의까지 남은 시간. 알림으로 열려 있는 동안만 붉게:
@@ -362,14 +364,14 @@ struct DropPanelView: View {
                             let alert = left <= 5 * 60 || (left > 10 * 60 - 10 && left <= 10 * 60)
                             let blinking = left <= 0 && left > -CalendarFeed.blink
                             let text = countdownText(to: start, now: now)
-                            clockColumn(text: text, title: tuning.locked ? Self.lockedTitle : Self.testTitle ?? calendar.summary,
+                            clockColumn(text: text, title: Self.testTitle ?? calendar.summary,
                                         color: clockColor(alert: alert, left: left),
                                         clockVisible: !blinking || Int(now.timeIntervalSinceReferenceDate * 2) % 2 == 0,
                                         colonBlink: left > 0 && left < 100 * 3600, now: now,
                                         width: clockWidth(for: text),
-                                        onTitle: tuning.locked ? nil : { openCalendarApp(next.showURL) })
+                                        onTitle: { openCalendarApp(next.showURL) })
                         } else {
-                            Text(tuning.locked ? Self.lockedTitle : calendar.summary)
+                            Text(calendar.summary)
                                 .foregroundStyle(Color(red: 0xcc / 255, green: 0xcc / 255, blue: 0xdd / 255))
                                 .onTapGesture {
                                     if calendar.status == .noAccount || calendar.status == .denied { calendar.startPicking() }
@@ -378,7 +380,7 @@ struct DropPanelView: View {
                         Spacer(minLength: 0)  // HH:MM:SS는 너비가 정해져 있어 최소 간격은 clockWidth가 정한다
                         // 오른쪽: 날짜·시각 글, 그 아래 "지금" 버튼. 롤오버하는 동안 글은 오늘 요일 / 월 일(하늘색)
                         VStack(alignment: .trailing, spacing: 10) {
-                            if hoverNow {
+                            if showNow {
                                 Text(Self.nowDay(now)).multilineTextAlignment(.trailing).fixedSize()
                                     .foregroundStyle(Color(red: Self.sky.r, green: Self.sky.g, blue: Self.sky.b))
                             } else if let when = home ? GoHome.when(now) : calendar.nextWhen {
@@ -386,7 +388,7 @@ struct DropPanelView: View {
                                     .foregroundStyle(Color(red: 0xcc / 255, green: 0xcc / 255, blue: 0xdd / 255))  // #ccccdd
                             }
                             NowIcon()
-                                .foregroundStyle(hoverNow ? Color(red: Self.sky.r, green: Self.sky.g, blue: Self.sky.b)
+                                .foregroundStyle(showNow ? Color(red: Self.sky.r, green: Self.sky.g, blue: Self.sky.b)
                                                           : Color(red: 0xcc / 255, green: 0xcc / 255, blue: 0xdd / 255))  // 위 날짜·시각 글과 같은 #ccccdd
                                 .frame(width: 14, height: 14)
                                 .offset(x: 1)  // 날짜 글 오른쪽 끝보다 1 오른쪽
