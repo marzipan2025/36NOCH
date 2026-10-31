@@ -378,13 +378,17 @@ struct DropPanelView: View {
                         } else if let next = calendar.next {
                             // 임시: 다음 회의까지 남은 시간. 알림으로 열려 있는 동안만 붉게:
                             // 10분 전 10초간, 5분 전부터 시작 뒤 00:00을 깜빡이는 10초까지
-                            let left = next.start.timeIntervalSince(now)
+                            // 시험용: `--test-long-countdown` 이면 회의를 12시간 뒤로 밀어 HH:MM:SS를 보여 준다
+                            let start = next.start.addingTimeInterval(CommandLine.arguments.contains("--test-long-countdown") ? 12 * 3600 : 0)
+                            let left = start.timeIntervalSince(now)
                             let alert = left <= 5 * 60 || (left > 10 * 60 - 10 && left <= 10 * 60)
                             let blinking = left <= 0 && left > -CalendarFeed.blink
-                            clockColumn(text: countdownText(to: next.start, now: now), title: calendar.summary,
+                            let text = countdownText(to: start, now: now)
+                            clockColumn(text: text, title: calendar.summary,
                                         color: clockColor(alert: alert, left: left),
                                         clockVisible: !blinking || Int(now.timeIntervalSinceReferenceDate * 2) % 2 == 0,
-                                        colonBlink: left > 0 && left < 3600, now: now,
+                                        colonBlink: left > 0 && left < 100 * 3600, now: now,
+                                        width: clockWidth(for: text, right: calendar.nextWhen),
                                         onTitle: openCalendarApp)
                         } else {
                             Text(calendar.summary)
@@ -393,9 +397,9 @@ struct DropPanelView: View {
                                     if calendar.status == .noAccount || calendar.status == .denied { calendar.startPicking() }
                                 }
                         }
-                        Spacer(minLength: 12)
+                        Spacer(minLength: 0)  // HH:MM:SS는 오른쪽 글 12 앞까지 넓히므로 최소 간격은 clockWidth가 지킨다
                         if let when = home ? GoHome.when(now) : calendar.nextWhen {
-                            Text(when.day + "\n" + when.time).multilineTextAlignment(.trailing)
+                            Text(when.day + "\n" + when.time).multilineTextAlignment(.trailing).fixedSize()
                                 .foregroundStyle(Color(red: 0xcc / 255, green: 0xcc / 255, blue: 0xdd / 255))  // #ccccdd
                         }
                     }
@@ -421,8 +425,8 @@ struct DropPanelView: View {
     /// 제목은 늘 시계 색을 70%로 어둡게 한 색.
     private func clockColumn(text: String, title: String, color: (r: Double, g: Double, b: Double),
                              clockVisible: Bool = true, colonBlink: Bool = false, now: Date = Date(),
-                             onTitle: (() -> Void)? = nil) -> some View {
-        let size = ClockFont.size(for: text, width: tuning.countdownWidth)
+                             width: CGFloat? = nil, onTitle: (() -> Void)? = nil) -> some View {
+        let size = ClockFont.size(for: text, width: width ?? tuning.countdownWidth)
         let small = NSFont.systemFont(ofSize: tuning.textSize, weight: .light)
         let smallCapTop = small.ascender - small.capHeight  // 작은 글 프레임 위 ~ 글자 위 끝
         // 제목은 오른쪽 날짜 글보다 2 크게. 시계와의 간격은 제목 글자 위 끝 기준이라 제목 글꼴로 잰다.
@@ -445,7 +449,18 @@ struct DropPanelView: View {
         .padding(.top, smallCapTop - size * ClockFont.capTop - tuning.countdownLift)
     }
 
-    /// 시계 색: 알림 중 #ff3b30, 1시간 이상 남음(HH:MM) #686B88, 그 밖에 금색 #ffd700
+    /// 시계 너비. HH:MM:SS(콜론 둘)는 글 줄 왼쪽에서 오른쪽 날짜·시각 글 12 앞까지 꽉 채운다.
+    /// 시계는 countdownX(음수)만큼 왼쪽으로 밀려 그려지므로 그만큼 더 넓힌다. 그 밖(MM:SS 등)은 countdownWidth.
+    private func clockWidth(for text: String, right: (day: String, time: String)?) -> CGFloat {
+        guard text.filter({ $0 == ":" }).count == 2 else { return tuning.countdownWidth }
+        let font = NSFont.systemFont(ofSize: tuning.textSize, weight: .light)
+        let rightWidth = [right?.day ?? "", right?.time ?? ""]
+            .map { ($0 as NSString).size(withAttributes: [.font: font]).width }.max() ?? 0
+        let content = popupSize.width - 2 * (tuning.textPadding + tuning.uiSideInset)
+        return content - ceil(rightWidth) - 12 - tuning.countdownX
+    }
+
+    /// 시계 색: 알림 중 #ff3b30, 1시간 이상 남음(HH:MM:SS) #686B88, 그 밖에 금색 #ffd700
     private func clockColor(alert: Bool, left: TimeInterval) -> (r: Double, g: Double, b: Double) {
         if alert { return (1, 0x3b / 255, 0x30 / 255) }
         if left >= 3600 { return (0x68 / 255, 0x6b / 255, 0x88 / 255) }
@@ -770,6 +785,10 @@ final class SiriDemo: NSObject {
         controlWindow = control
         // 시험용: `--test-settings` 로 띄우면 설정창을 바로 연다
         if CommandLine.arguments.contains("--test-settings") { control.orderFrontRegardless() }
+        // 시험용: `--test-settings --test-open` 이면 2초 뒤 노치를 열고, 설정창이 떠 있는 동안 펼친 채 둔다
+        if CommandLine.arguments.contains("--test-open") {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.tuning.isOpen = true }
+        }
 
         // 마우스 위치를 짧은 간격으로 확인한다. 전역 이벤트 감시와 달리 손쉬운 사용 권한이 필요 없다.
         let timer = Timer(timeInterval: 1.0 / 60, repeats: true) { [weak self] _ in

@@ -219,11 +219,11 @@ extension CalendarFeed {
     }
 }
 
-/// 남은 시간. 되도록 네 자리로: 1시간 미만 "MM:SS", 100시간 미만 "HH:MM"(초는 버림, 날로 나누지 않음), 그 이상 "4 days".
+/// 남은 시간: 1시간 미만 "MM:SS", 100시간 미만 "HH:MM:SS"(날로 나누지 않음), 그 이상 "4 days".
 func countdownText(to date: Date, now: Date) -> String {
     let total = max(0, Int(date.timeIntervalSince(now)))
     if total < 3600 { return String(format: "%02d:%02d", total / 60, total % 60) }
-    if total < 100 * 3600 { return String(format: "%02d:%02d", total / 3600, total % 3600 / 60) }
+    if total < 100 * 3600 { return String(format: "%02d:%02d:%02d", total / 3600, total % 3600 / 60, total % 60) }
     return "\(total / 86400) days"
 }
 
@@ -324,7 +324,7 @@ final class DigitFonts {
 }
 
 /// 시계 글자. 글자마다 칸을 나눠 그린다(숫자 칸은 모두 같은 폭, 높이는 DistroMix 줄 높이로 고정). 글꼴이 섞여도 바닥선을 맞춘다.
-/// colonBlink면 콜론이 1초에 한 번 깜빡인다(앞 0.5초 보임, 뒤 0.5초 숨김).
+/// colonBlink면 초 왼쪽 콜론이 1초에 한 번 깜빡인다(앞 0.5초 보임, 뒤 0.5초 숨김).
 struct ClockText: View {
     let text: String
     let size: CGFloat
@@ -335,6 +335,8 @@ struct ClockText: View {
     var body: some View {
         let fonts = picker.fonts(for: text)
         let colonOn = !colonBlink || now.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: 1) < 0.5
+        // 깜빡이는 건 초 왼쪽 콜론 하나(MM:SS, HH:MM:SS 모두 마지막 콜론)
+        let blinkAt = text.lastIndex(of: ":").map { text.distance(from: text.startIndex, to: $0) }
         HStack(alignment: .top, spacing: 0) {
             ForEach(Array(text.enumerated()), id: \.offset) { i, c in
                 let f = i < fonts.count ? fonts[i] : ClockFont.name
@@ -344,7 +346,7 @@ struct ClockText: View {
                     // 글꼴이 바뀌어도 칸 높이·바닥선이 DistroMix와 같게
                     .offset(y: (ClockFont.ascender(ClockFont.name) - ClockFont.ascender(f)) * size)
                     .frame(width: ClockFont.cell(c) * size, height: ClockFont.lineHeight * size, alignment: .top)
-                    .opacity(c == ":" && !colonOn ? 0 : 1)
+                    .opacity(i == blinkAt && !colonOn ? 0 : 1)
             }
         }
         .fixedSize()
