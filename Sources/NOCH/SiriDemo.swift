@@ -230,6 +230,8 @@ struct DropPanelView: View {
     @State private var hoverLeft = false
     @State private var hoverRight = false
     @State private var hoverTitle = false
+    // 날짜 글 아래 "지금" 버튼에 마우스가 있는 동안 시계·날짜를 지금 시각으로. 시험용: `--test-now` 면 처음부터 켠 채로
+    @State private var hoverNow = CommandLine.arguments.contains("--test-now")
 
     private var notchButtons: some View {
         let d: CGFloat = 14
@@ -339,10 +341,15 @@ struct DropPanelView: View {
                     // 퇴근 알림은 닫힘 모션이 끝날 때까지(10초 + 2초) 그대로 보여 준다
                     let home = GoHome.isTime(now, seconds: GoHome.seconds + 2)
                     HStack(alignment: .top) {
-                        if home {
+                        if hoverNow {
+                            // "지금" 버튼 롤오버: 시계 자리에 지금 시각(HH:MM:SS)을 퇴근 알림과 같은 하늘색으로, 아래 제목은 없음
+                            let text = Self.nowClock(now)
+                            clockColumn(text: text, title: "", color: Self.sky, colonBlink: true, now: now,
+                                        width: clockWidth(for: text))
+                        } else if home {
                             // 평일 18시: "18:00"을 하늘색으로, 열려 있는 10초 동안 회의 시작 00:00처럼 깜빡인다
                             let blinking = GoHome.isTime(now, seconds: GoHome.seconds)
-                            clockColumn(text: GoHome.clock, title: "Go home Now!", color: (0x87 / 255, 0xce / 255, 0xeb / 255),  // skyblue #87ceeb
+                            clockColumn(text: GoHome.clock, title: "Go home Now!", color: Self.sky,
                                         clockVisible: !blinking || Int(now.timeIntervalSinceReferenceDate * 2) % 2 == 0)
                         } else if let next = calendar.next {
                             // 임시: 다음 회의까지 남은 시간. 알림으로 열려 있는 동안만 붉게:
@@ -367,9 +374,21 @@ struct DropPanelView: View {
                                 }
                         }
                         Spacer(minLength: 0)  // HH:MM:SS는 너비가 정해져 있어 최소 간격은 clockWidth가 정한다
-                        if let when = home ? GoHome.when(now) : calendar.nextWhen {
-                            Text(when.day + "\n" + when.time).multilineTextAlignment(.trailing).fixedSize()
-                                .foregroundStyle(Color(red: 0xcc / 255, green: 0xcc / 255, blue: 0xdd / 255))  // #ccccdd
+                        // 오른쪽: 날짜·시각 글, 그 아래 "지금" 버튼. 롤오버하는 동안 글은 오늘 요일 / 월 일(하늘색)
+                        VStack(alignment: .trailing, spacing: 10) {
+                            if hoverNow {
+                                Text(Self.nowDay(now)).multilineTextAlignment(.trailing).fixedSize()
+                                    .foregroundStyle(Color(red: Self.sky.r, green: Self.sky.g, blue: Self.sky.b))
+                            } else if let when = home ? GoHome.when(now) : calendar.nextWhen {
+                                Text(when.day + "\n" + when.time).multilineTextAlignment(.trailing).fixedSize()
+                                    .foregroundStyle(Color(red: 0xcc / 255, green: 0xcc / 255, blue: 0xdd / 255))  // #ccccdd
+                            }
+                            NowIcon()
+                                .foregroundStyle(hoverNow ? Color(red: Self.sky.r, green: Self.sky.g, blue: Self.sky.b)
+                                                          : Color(red: 0xcc / 255, green: 0xcc / 255, blue: 0xde / 255))  // #CCCCDE
+                                .frame(width: 14, height: 14)
+                                .contentShape(Rectangle().inset(by: -6))
+                                .onHover { hoverNow = $0 }
                         }
                     }
                 }
@@ -418,6 +437,25 @@ struct DropPanelView: View {
         }
         // 숫자 위 끝이 오른쪽 날짜 글자 위 끝과 같은 높이에 오도록 끌어올린다
         .padding(.top, smallCapTop - size * ClockFont.capTop - tuning.countdownLift)
+    }
+
+    /// 하늘색 #87ceeb: 퇴근 알림 시계, "지금" 버튼 롤오버
+    private static let sky: (r: Double, g: Double, b: Double) = (0x87 / 255, 0xce / 255, 0xeb / 255)
+
+    /// "지금" 버튼 롤오버 때 시계: 지금 시각 HH:MM:SS(24시간)
+    private static func nowClock(_ now: Date) -> String {
+        let c = Foundation.Calendar.current.dateComponents([.hour, .minute, .second], from: now)
+        return String(format: "%02d:%02d:%02d", c.hour ?? 0, c.minute ?? 0, c.second ?? 0)
+    }
+
+    /// "지금" 버튼 롤오버 때 오른쪽 글: 요일 전체 / 월 세 글자 + 일 (예: Tuesday / Nov 3)
+    private static func nowDay(_ now: Date) -> String {
+        let f = DateFormatter()
+        f.locale = Locale(identifier: "en_US")
+        f.dateFormat = "EEEE"
+        let day = f.string(from: now)
+        f.dateFormat = "MMM d"
+        return day + "\n" + f.string(from: now)
     }
 
     /// 시험용: `--test-title <글>` 이면 시계 아래 제목을 그 글로 바꿔 보여 준다(긴 제목이 어디까지 늘어나는지 볼 때)
