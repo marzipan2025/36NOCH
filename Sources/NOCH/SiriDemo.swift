@@ -407,9 +407,12 @@ struct DropPanelView: View {
                                 Text(when.day + "\n" + when.time).multilineTextAlignment(.trailing).fixedSize()
                                     .foregroundStyle(Color(red: 0xcc / 255, green: 0xcc / 255, blue: 0xdd / 255))  // #ccccdd
                             }
+                            // 지금 시각이면 하늘색, 타이머가 보이는 동안은 타이머 시계 색, 그 밖엔 위 날짜·시각 글과 같은 #ccccdd
+                            let icon: (r: Double, g: Double, b: Double) = showNow ? Self.sky
+                                : showTimer ? clockColor(alert: (timerLeft ?? 0) <= 5 * 60, left: timerLeft ?? 0)
+                                : (0xcc / 255, 0xcc / 255, 0xdd / 255)
                             NowIcon()
-                                .foregroundStyle(showNow ? Color(red: Self.sky.r, green: Self.sky.g, blue: Self.sky.b)
-                                                          : Color(red: 0xcc / 255, green: 0xcc / 255, blue: 0xdd / 255))  // 위 날짜·시각 글과 같은 #ccccdd
+                                .foregroundStyle(Color(red: icon.r, green: icon.g, blue: icon.b))
                                 .frame(width: 14, height: 14)
                                 .offset(x: 1)  // 날짜 글 오른쪽 끝보다 1 오른쪽
                                 .contentShape(Rectangle().inset(by: -6))
