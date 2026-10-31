@@ -11,7 +11,7 @@ import SwiftUI
 
 import Combine
 
-/// 모든 조절 값. 기본값은 2026-10-31 사용자가 맞춘 8차 설정.
+/// 모든 조절 값. 기본값은 2026-10-31 사용자가 맞춘 9차 설정.
 /// 바꾼 값은 UserDefaults에 저장해서 앱을 다시 켜도 이어진다.
 final class DropTuning: ObservableObject {
     // 노치 확장
@@ -19,7 +19,7 @@ final class DropTuning: ObservableObject {
     @Published var growHeight: CGFloat = 12
     @Published var restWide = true                  // 닫혀 있을 때도 노치 검정을 좌우로 늘여 둔다
     @Published var restWidth: CGFloat = 44           // 그때 늘이는 너비(양쪽 합, 한쪽 22)
-    @Published var grownBottomRadius: CGFloat = 20   // 커진 노치 아래 모서리(볼록). 원래 노치 10
+    @Published var grownBottomRadius: CGFloat = 16   // 커진 노치 아래 모서리(볼록). 원래 노치 10
     @Published var grownTopRadius: CGFloat = 12      // 커진 노치 위 모서리(오목). 원래 노치 6
     // 팝업 방울
     @Published var popupHeight: CGFloat = 240
@@ -89,10 +89,10 @@ final class DropTuning: ObservableObject {
     /// 바뀔 때마다 패널이 열기/닫기 모션을 한다. 마우스 위치(SiriDemo)나 설정창 버튼이 바꾼다.
     @Published var isOpen = false
 
-    /// 8차 설정(= 기본값): 2026-10-31 집 맥. 7차(노치 높이 + 12, 간격 12, 붙는 거리 12, 검정 반지름 60)에
-    /// 팝업 높이 220→240, 커진 노치 너비 + 100→92(뒤에 80으로 12 더 줄임), 노치와 간격 12→14, 커진 노치 아래 모서리 26→20을 더한 값. 조절하다가 이 값으로 되돌릴 때 쓴다.
-    func applyEighthPreset() {
-        growWidth = 80; growHeight = 12; restWide = true; restWidth = 44; grownBottomRadius = 20; grownTopRadius = 12; popupHeight = 240
+    /// 9차 설정(= 기본값): 2026-10-31 집 맥. 8차(7차에 팝업 높이 240, 커진 노치 너비 + 80, 노치와 간격 14)에서
+    /// 커진 노치 아래 모서리 26→16. 조절하다가 이 값으로 되돌릴 때 쓴다.
+    func applyNinthPreset() {
+        growWidth = 80; growHeight = 12; restWide = true; restWidth = 44; grownBottomRadius = 16; grownTopRadius = 12; popupHeight = 240
         popupRadius = 26; gap = 14; spacing = 12; grainHeight = 34; waitInset = 4
         inkDelay = 0; inkDuration = 0.65; inkNeck = true; clearGlass = true; tintOpacity = 0
         lift = 96; softness = 28.5; blackRadius = 60; sideInset = -5.5; blackOpacity = 1; overBlack = 0.65
@@ -613,7 +613,7 @@ struct DropControlView: View {
                 Button("닫기") { tuning.isOpen = false }
                 Button("다시 재생") { replay() }
                 Spacer()
-                Button("8차설정") { tuning.applyEighthPreset(); replay() }
+                Button("9차설정") { tuning.applyNinthPreset(); replay() }
                 Button("종료") { NSApp.terminate(nil) }
             }
             .padding(16)
