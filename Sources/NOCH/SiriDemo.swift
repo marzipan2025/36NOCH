@@ -353,7 +353,7 @@ struct DropPanelView: View {
                             let alert = left <= 5 * 60 || (left > 10 * 60 - 10 && left <= 10 * 60)
                             let blinking = left <= 0 && left > -CalendarFeed.blink
                             let text = countdownText(to: start, now: now)
-                            clockColumn(text: text, title: calendar.summary,
+                            clockColumn(text: text, title: Self.testTitle ?? calendar.summary,
                                         color: clockColor(alert: alert, left: left),
                                         clockVisible: !blinking || Int(now.timeIntervalSinceReferenceDate * 2) % 2 == 0,
                                         colonBlink: left > 0 && left < 100 * 3600, now: now,
@@ -417,6 +417,13 @@ struct DropPanelView: View {
         // 숫자 위 끝이 오른쪽 날짜 글자 위 끝과 같은 높이에 오도록 끌어올린다
         .padding(.top, smallCapTop - size * ClockFont.capTop - tuning.countdownLift)
     }
+
+    /// 시험용: `--test-title <글>` 이면 시계 아래 제목을 그 글로 바꿔 보여 준다(긴 제목이 어디까지 늘어나는지 볼 때)
+    private static let testTitle: String? = {
+        let args = CommandLine.arguments
+        guard let i = args.firstIndex(of: "--test-title"), i + 1 < args.count else { return nil }
+        return args[i + 1]
+    }()
 
     /// 시계 너비. HH:MM:SS(콜론 둘)는 날짜와 상관없이 고정: 글 줄 너비에서 68을 뺀 너비.
     /// 68 = "Sat, Oct 31" 너비(57) + 간격 12 + countdownX(−9, 왼쪽으로 밀려 그려지는 만큼) + 8.
