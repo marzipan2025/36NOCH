@@ -957,7 +957,7 @@ final class SiriDemo: NSObject {
     }
 
     private var alertUntil = Date.distantPast
-    /// 데스크탑을 바꿔 닫았을 때: 진행 중인 알림은 끝날 때까지 붙들지 않고(alertMuted),
+    /// 데스크탑을 바꿔 닫았을 때: 진행 중인 알림(계정 고르기)은 끝날 때까지 붙들지 않고(alertMuted),
     /// 마우스가 노치 위에 있었으면 한 번 벗어날 때까지 다시 열지 않는다(reopenBlocked)
     private var alertMuted = false
     private var spaceSwipe: SpaceSwipeWatcher?
@@ -965,8 +965,11 @@ final class SiriDemo: NSObject {
 
     /// 데스크탑(스페이스)이 바뀌면 설정창을 닫고 노치도 닫힘 모션으로 닫는다. 계정 고르기 중이면 "Choose later"와 같게 처리.
     /// macOS 공식 알림이라 권한이 필요 없지만, 전환이 거의 끝난 뒤에 온다(스와이프 30% 같은 중간 시점은 알 수 없음).
+    /// 다만 회의 알림(10분 전 10초, 5분 전부터 시작 뒤 00:00 깜빡임까지)과 퇴근 알림으로 열려 있는 동안은
+    /// 시간을 계속 보여 주는 게 우선이라 노치는 닫지 않는다(설정창만 닫는다).
     private func closeForSpaceChange() {
         controlWindow?.orderOut(nil)
+        if meetingAlert() || GoHome.isTime(Date(), seconds: GoHome.seconds) { return }
         if calendar.picking { calendar.later() }
         alertMuted = true
         reopenBlocked = true
