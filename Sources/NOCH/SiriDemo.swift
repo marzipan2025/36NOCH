@@ -63,7 +63,8 @@ final class DropTuning: ObservableObject {
     let textSize: CGFloat = 11
     let textPadding: CGFloat = 22
     let textTop: CGFloat = 30                // 팝업 위 끝 ~ 시계·글 위 끝(2026-10-31 18 → 38(팝업 높이도 20 늘림) → 30)
-    let popupSideExtra: CGFloat = 27         // 시계·글·하단 영역은 그대로 두고 노치만 좌우로 더 넓힌 양(한쪽). 그만큼 안쪽 여백이 는다(12 → 27: 전체 30 넓힘)
+    let popupSideExtra: CGFloat = 57         // 커진 노치를 좌우로 더 넓힌 양(한쪽). 12 → 27(전체 30) → 57(전체 60 더)
+    let uiSideInset: CGFloat = 30            // 마지막 60 넓힐 때 글·아이콘 자리는 그대로 두려고 더한 안쪽 여백(한쪽). 하단 캡슐은 같이 넓어진다
     let clockGap: CGFloat = 10               // 실제 노치 아래 끝 ~ 시계 숫자 위 끝(4에서 6 내림)
     // 팝업이 커진 노치보다 넓은 양(양쪽 합). 커진 노치를 줄일 때(너비 + 100 → 92 → 80) 팝업 너비는 그대로 두려고
     // 줄인 만큼(8, 12) 24에 더함
@@ -267,7 +268,7 @@ struct DropPanelView: View {
         let d: CGFloat = 14
         // 닫혀 있으면 실제 노치 좌우 끝 바로 바깥, 열리면 아이콘 바깥 끝을 글 좌우 끝(노치 끝에서 textPadding)에 맞춘다.
         // 높이는 실제 노치 가운데, 열리면 2 아래.
-        let x = grown ? popupSize.width / 2 - tuning.textPadding - d / 2
+        let x = grown ? popupSize.width / 2 - tuning.textPadding - tuning.uiSideInset - d / 2
                       : metrics.width / 2 + d / 2
         let y = metrics.height / 2 - d / 2 + (grown ? 2 : 0)
         let color = grown ? Color(red: 0x24 / 255, green: 0x25 / 255, blue: 0x2F / 255)
@@ -397,7 +398,7 @@ struct DropPanelView: View {
                 } }
                     .font(.system(size: tuning.textSize, weight: .light))
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, tuning.textPadding)  // 노치 좌우 끝에서 22. 넓어진 너비에 맞춰 시계는 왼쪽, 날짜는 오른쪽으로
+                    .padding(.horizontal, tuning.textPadding + tuning.uiSideInset)  // 노치 좌우 끝에서 22 + 30
                     .padding(.top, tuning.contentTop(metrics: metrics))
                     .opacity(dropped ? 1 : 0)
             }
