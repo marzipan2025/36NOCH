@@ -1,13 +1,8 @@
 import AppKit
 import SwiftUI
 
-// 실험: 노치가 넓어지고, 거기서 유리 방울이 떨어지듯 팝업이 생긴다.
-//   1) 노치가 너비·높이·모서리 반지름이 함께 커진다(검정).
-//   2) 커진 노치에서 Liquid Glass 방울이 맺혀 아래로 떨어지며 팝업이 된다. 팝업 너비 = 커진 노치 너비.
-// 방울 느낌은 GlassEffectContainer에 맡긴다. 같은 컨테이너 안의 유리 모양들은 가까워지면
-// 액체처럼 붙고(spacing 이내), 멀어지면 목이 늘어나다 끊어진다(RESEARCH §3.5).
-// 팝업 안에는 위에서 내려오는 검정을 유리 "아래"에 깐다. 검정은 팝업 모양을 따라 휘며 사라지고,
-// 유리가 그 위에서 굴절·반사해서 검정 부분도 액체 유리처럼 보인다.
+// 노치가 좌우·아래로 커지며(처음엔 온통 검정) 아래쪽 검정이 걷혀 Liquid Glass가 드러나는 패널.
+// 검정은 유리 "아래"에 깔아 유리가 그 위에서 굴절·반사하게 하고, 위쪽 띠는 하드웨어 노치와 같은 검정으로 덮는다.
 
 import Combine
 
@@ -16,21 +11,14 @@ import Combine
 final class DropTuning: ObservableObject {
     // 노치 확장
     @Published var growWidth: CGFloat = 80
-    @Published var growHeight: CGFloat = 12
     @Published var restWide = true                  // 닫혀 있을 때도 노치 검정을 좌우로 늘여 둔다
     @Published var restWidth: CGFloat = 44           // 그때 늘이는 너비(양쪽 합, 한쪽 22)
-    @Published var grownBottomRadius: CGFloat = 16   // 커진 노치 아래 모서리(볼록). 원래 노치 10
     @Published var grownTopRadius: CGFloat = 21.5      // 커진 노치 위 모서리(오목). 원래 노치 6
-    // 팝업 방울
+    // 열린 높이와 검정 → 유리 전환
     @Published var popupHeight: CGFloat = 232
-    @Published var popupRadius: CGFloat = 26
-    @Published var gap: CGFloat = 14                 // 커진 노치 아래 끝과 팝업 위 끝 사이
-    @Published var spacing: CGFloat = 12             // GlassEffectContainer가 두 유리를 붙이는 거리
-    @Published var grainHeight: CGFloat = 34         // 떨어지기 전 팝업 높이(실제 노치 밑에 숨어 있음)
-    @Published var waitInset: CGFloat = 4            // 대기 중 팝업을 실제 노치보다 좁힐 너비(양쪽 합). 하드웨어 노치에 완전히 가려지게
-    @Published var inkDelay: CGFloat = 0             // 떨어지기 시작하고 검정이 빠지기 시작할 때까지(초)
+    @Published var inkDelay: CGFloat = 0             // 커지기 시작하고 검정이 걷히기 시작할 때까지(초)
     @Published var inkDuration: CGFloat = 0.65       // 검정 → 유리로 바뀌는 시간(초)
-    @Published var inkNeck = true                    // 노치와 방울 사이 목도 유리 틴트로 검게
+    @Published var inkNeck = true                    // 온통 검정인 동안 유리 자체도 검게 물들인다
     // 유리
     @Published var clearGlass = true
     @Published var tintOpacity: CGFloat = 0.05
@@ -41,14 +29,10 @@ final class DropTuning: ObservableObject {
     @Published var sideInset: CGFloat = -1          // 양옆에서 들임. 키우면 옆 가장자리에 유리가 더 드러남
     @Published var blackOpacity: CGFloat = 1
     @Published var overBlack: CGFloat = 0.65          // 같은 검정 모양을 유리 "위"에도 이만큼 덧칠. 유리가 검정을 밝혀 보이게 하는 만큼 다시 어둡게
-    // 하단 영역: 팝업 아래쪽 안에 둔 흰 반투명 면. 이 안에는 검정이 들어오지 않는다.
+    // 하단 캡슐: 노치 아래쪽 안에 둔 흰 반투명 면(좌우 반원). 이 안에는 검정이 들어오지 않는다.
     @Published var trayHeight: CGFloat = 48
     @Published var trayMargin: CGFloat = 36          // 좌우·아래 여백
     @Published var trayOpacity: CGFloat = 0.1        // 흰색 불투명도
-    @Published var trayConcentric = true             // 켜면 모서리 = 팝업 모서리 − 여백(같은 중심의 곡선), 끄면 팝업과 같은 반지름
-    @Published var trayRadiusPlus: CGFloat = 4       // 위 규칙으로 정한 모서리에 더하는 값
-    @Published var trayCapsule = true                // 켜면 좌우가 완전한 반원(위 두 규칙 무시)
-    @Published var popupBottomConcentric = true      // 켜면 팝업 아래 두 모서리 = 하단 영역 모서리 + 여백(같은 중심의 곡선)
     @Published var trayDelay: CGFloat = -0.2         // 팝업 등장이 끝나고 이만큼 뒤에 나타난다(초). 음수면 끝나기 전
     @Published var trayFade: CGFloat = 0.3           // 나타나고 사라지는 시간(초). 닫을 때는 닫힘 시작과 함께 사라진다
     // 덧그린 테두리 빛
@@ -79,9 +63,6 @@ final class DropTuning: ObservableObject {
     // 모션(초)
     @Published var growDuration: CGFloat = 0.6
     @Published var growBounce: CGFloat = 0.2
-    @Published var dropDelay: CGFloat = -0.7
-    @Published var dropDuration: CGFloat = 0.55
-    @Published var dropBounce: CGFloat = 0.2
     @Published var closeSpeed: CGFloat = 0.5         // 닫힘은 열림의 정확한 역재생. 이 값은 시간 배율(1 = 열 때와 같은 속도, 작을수록 빠름)
 
     // 마우스
@@ -96,40 +77,32 @@ final class DropTuning: ObservableObject {
     /// 11차 설정(= 기본값): 2026-10-31 집 맥. 10차에서 하단 캡슐 좌우·아래 여백 31.5 → 36.
     /// 조절하다가 이 값으로 되돌릴 때 쓴다.
     func applyEleventhPreset() {
-        growWidth = 80; growHeight = 12; restWide = true; restWidth = 44; grownBottomRadius = 16; grownTopRadius = 21.5; popupHeight = 232
-        popupRadius = 26; gap = 14; spacing = 12; grainHeight = 34; waitInset = 4
+        growWidth = 80; restWide = true; restWidth = 44; grownTopRadius = 21.5; popupHeight = 232
         inkDelay = 0; inkDuration = 0.65; inkNeck = true; clearGlass = true; tintOpacity = 0.05
         lift = 65.5; softness = 37; blackRadius = 44; sideInset = -1; blackOpacity = 1; overBlack = 0.65
-        trayHeight = 48; trayMargin = 36; trayOpacity = 0.1; trayConcentric = true
-        trayRadiusPlus = 4; trayDelay = -0.2; trayFade = 0.3; trayCapsule = true; popupBottomConcentric = true
+        trayHeight = 48; trayMargin = 36; trayOpacity = 0.1; trayDelay = -0.2; trayFade = 0.3
         rimOpacity = 0.05; rimWidth = 1; rimSoftness = 1; shadowOpacity = 0.3; shadowRadius = 28
         shadowY = 14.5; growDuration = 0.6
-        growBounce = 0.2; dropDelay = -0.7; dropDuration = 0.55; dropBounce = 0.2; closeSpeed = 0.5
+        growBounce = 0.2; closeSpeed = 0.5
     }
 
     // MARK: 저장
 
     /// 저장·출력하는 값 목록. 새 조절 값을 만들면 여기에도 넣는다(isOpen 같은 상태는 빼고).
     private static let numbers: [(String, ReferenceWritableKeyPath<DropTuning, CGFloat>)] = [
-        ("growWidth", \.growWidth), ("growHeight", \.growHeight),
-        ("grownBottomRadius", \.grownBottomRadius), ("grownTopRadius", \.grownTopRadius),
-        ("popupHeight", \.popupHeight), ("popupRadius", \.popupRadius), ("gap", \.gap), ("spacing", \.spacing),
-        ("grainHeight", \.grainHeight), ("waitInset", \.waitInset),
+        ("growWidth", \.growWidth), ("grownTopRadius", \.grownTopRadius), ("popupHeight", \.popupHeight),
         ("inkDelay", \.inkDelay), ("inkDuration", \.inkDuration), ("tintOpacity", \.tintOpacity),
         ("lift", \.lift), ("softness", \.softness), ("blackRadius", \.blackRadius),
         ("sideInset", \.sideInset), ("blackOpacity", \.blackOpacity), ("overBlack", \.overBlack),
         ("trayHeight", \.trayHeight), ("trayMargin", \.trayMargin), ("trayOpacity", \.trayOpacity),
-        ("trayRadiusPlus", \.trayRadiusPlus), ("trayDelay", \.trayDelay), ("trayFade", \.trayFade),
+        ("trayDelay", \.trayDelay), ("trayFade", \.trayFade),
         ("rimOpacity", \.rimOpacity), ("rimWidth", \.rimWidth), ("rimSoftness", \.rimSoftness),
         ("shadowOpacity", \.shadowOpacity), ("shadowRadius", \.shadowRadius), ("shadowY", \.shadowY),
-        ("growDuration", \.growDuration), ("growBounce", \.growBounce), ("dropDelay", \.dropDelay),
-        ("dropDuration", \.dropDuration), ("dropBounce", \.dropBounce), ("closeSpeed", \.closeSpeed),
+        ("growDuration", \.growDuration), ("growBounce", \.growBounce), ("closeSpeed", \.closeSpeed),
         ("restWidth", \.restWidth), ("hoverMargin", \.hoverMargin), ("hoverDown", \.hoverDown), ("keepMargin", \.keepMargin),
     ]
     private static let flags: [(String, ReferenceWritableKeyPath<DropTuning, Bool>)] = [
         ("inkNeck", \.inkNeck), ("restWide", \.restWide), ("clearGlass", \.clearGlass), ("holdWhileSettings", \.holdWhileSettings),
-        ("trayConcentric", \.trayConcentric), ("trayCapsule", \.trayCapsule),
-        ("popupBottomConcentric", \.popupBottomConcentric),
     ]
     private static let defaultsKey = "dropTuning"
     private var saving: AnyCancellable?
@@ -158,14 +131,11 @@ final class DropTuning: ObservableObject {
 
     /// 열림 시간표(초). 스프링 길이는 눈에 보이게 움직이는 데까지(visibleDuration)로 잡는다.
     /// 닫힘은 이 시간표를 거꾸로 돌린다.
-    var openTimeline: (grow: Spring, drop: Spring, dropStart: Double, inkStart: Double, total: Double) {
+    var openTimeline: (grow: Spring, inkStart: Double, total: Double) {
         let grow = Spring(duration: Double(growDuration), bounce: Double(growBounce))
-        let drop = Spring(duration: Double(dropDuration), bounce: Double(dropBounce))
-        let dropStart = 0.0  // 팝업이 노치와 하나가 되어 떨어짐은 없다
         let inkStart = Double(inkDelay)
-        // 팝업이 노치와 하나가 되어(2026-10-31) 따로 떨어지지 않는다. drop 값은 남겨 두지만 전체 길이에 넣지 않는다.
         let total = max(grow.visibleDuration, inkStart + Double(inkDuration))
-        return (grow, drop, dropStart, inkStart, total)
+        return (grow, inkStart, total)
     }
 
     var summary: String {
@@ -229,17 +199,12 @@ struct DropPanelView: View {
                               bottomRadius: NotchMetrics.bottomRadius + 4, topRadius: NotchMetrics.topRadius)
         }
         let limit = min(size.height / 2, size.width / 2)
-        let bottom = tuning.popupBottomConcentric ? min(trayRadius + tuning.trayMargin, limit) : min(tuning.popupRadius, limit)
+        let bottom = min(trayRadius + tuning.trayMargin, limit)  // 하단 캡슐 곡선과 같은 중심
         return NotchShape(width: size.width, height: size.height, bottomRadius: bottom, topRadius: tuning.grownTopRadius)
     }
 
-    /// 하단 영역 모서리 반지름. 팝업의 위 모서리 기준으로 정해서, 팝업 아래 모서리와 서로 물고 돌지 않게 한다.
-    private var trayRadius: CGFloat {
-        if tuning.trayCapsule { return tuning.trayHeight / 2 }
-        let outer = min(tuning.popupRadius, popupSize.height / 2, popupSize.width / 2)
-        let base = tuning.trayConcentric ? max(0, outer - tuning.trayMargin) : outer
-        return max(0, min(base + tuning.trayRadiusPlus, tuning.trayHeight / 2))
-    }
+    /// 하단 캡슐 모서리 반지름(좌우 완전한 반원). 노치 아래 모서리는 이것 + 여백.
+    private var trayRadius: CGFloat { tuning.trayHeight / 2 }
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -809,17 +774,6 @@ final class SiriDemo: NSObject {
         RunLoop.main.add(timer, forMode: .common)
         mouseTimer = timer
 
-        NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.activeSpaceDidChangeNotification, object: nil, queue: .main
-        ) { [weak self] _ in
-            MainActor.assumeIsolated { self?.closeForSpaceChange() }
-        }
-        // 트랙패드 스와이프로 옆 데스크탑이 30% 들어오면 넘어가기 전에 닫는다(입력 모니터링 권한 필요).
-        // 위 공식 알림은 키보드·Mission Control로 바꿀 때와, 이 방법이 안 될 때를 맡는다.
-        let swipe = SpaceSwipeWatcher { [weak self] in self?.closeForSpaceChange() }
-        swipe.start()
-        spaceSwipe = swipe
-
         setUpStatusItem()
     }
 
@@ -906,10 +860,7 @@ final class SiriDemo: NSObject {
         // 회의 알림도 마찬가지로 마우스와 상관없이 펼친 채 유지한다.
         // 팝업에서 캘린더 계정을 고르는 동안도 열어 둔다(고를 계정이 있을 때만. 권한 거부·계정 없음은 안내 글만이라 붙들지 않는다).
         let choosing = calendar.picking && calendar.status != .denied && !calendar.accounts.isEmpty
-        var alerting = meetingAlert() || GoHome.isTime(Date(), seconds: GoHome.seconds) || choosing
-        // 데스크탑을 바꿔 닫은 알림은 그 알림이 끝날 때까지 다시 열지 않는다
-        if !alerting { alertMuted = false }
-        if alertMuted { alerting = false }
+        let alerting = meetingAlert() || GoHome.isTime(Date(), seconds: GoHome.seconds) || choosing
         if alerting && !t.isOpen { t.isOpen = true }
         let holding = alerting || (t.holdWhileSettings && (controlWindow?.isVisible ?? false))
         if !holding {
@@ -923,9 +874,7 @@ final class SiriDemo: NSObject {
                 let hover = CGRect(x: notch.minX - t.hoverMargin, y: notch.minY - t.hoverDown,
                                    width: notch.width + t.hoverMargin * 2,
                                    height: notch.height + t.hoverDown + t.hoverMargin)
-                // 데스크탑을 바꿔 닫은 뒤에는 마우스가 한 번 노치 밖으로 나갔다 와야 다시 연다
-                if !hover.contains(mouse) { reopenBlocked = false }
-                if hover.contains(mouse) && !reopenBlocked { t.isOpen = true }
+                if hover.contains(mouse) { t.isOpen = true }
             }
         }
         // 열려 있고 마우스가 노치+팝업 위에 있을 때만 클릭을 받는다(설정 아이콘).
@@ -935,24 +884,6 @@ final class SiriDemo: NSObject {
     }
 
     private var alertUntil = Date.distantPast
-    /// 데스크탑을 바꿔 닫았을 때: 진행 중인 알림(계정 고르기)은 끝날 때까지 붙들지 않고(alertMuted),
-    /// 마우스가 노치 위에 있었으면 한 번 벗어날 때까지 다시 열지 않는다(reopenBlocked)
-    private var alertMuted = false
-    private var spaceSwipe: SpaceSwipeWatcher?
-    private var reopenBlocked = false
-
-    /// 데스크탑(스페이스)이 바뀌면 설정창을 닫고 노치도 닫힘 모션으로 닫는다. 계정 고르기 중이면 "Choose later"와 같게 처리.
-    /// macOS 공식 알림이라 권한이 필요 없지만, 전환이 거의 끝난 뒤에 온다(스와이프 30% 같은 중간 시점은 알 수 없음).
-    /// 다만 회의 알림(10분 전 10초, 5분 전부터 시작 뒤 00:00 깜빡임까지)과 퇴근 알림으로 열려 있는 동안은
-    /// 시간을 계속 보여 주는 게 우선이라 노치는 닫지 않는다(설정창만 닫는다).
-    private func closeForSpaceChange() {
-        controlWindow?.orderOut(nil)
-        if meetingAlert() || GoHome.isTime(Date(), seconds: GoHome.seconds) { return }
-        if calendar.picking { calendar.later() }
-        alertMuted = true
-        reopenBlocked = true
-        tuning.isOpen = false
-    }
     private var alertedTen: String?
     private var reloadedAfter: String?
 

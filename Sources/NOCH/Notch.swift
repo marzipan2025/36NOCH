@@ -34,7 +34,6 @@ struct NotchShape: Shape {
     var height: CGFloat
     var bottomRadius: CGFloat
     var topRadius: CGFloat
-    var outset: CGFloat = 0
 
     // 펼침 애니메이션에서 크기와 두 모서리가 부드럽게 바뀌도록
     var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, AnimatablePair<CGFloat, CGFloat>> {
@@ -47,19 +46,15 @@ struct NotchShape: Shape {
         }
     }
 
-    /// 아래 모서리 반지름의 기하학적 최대. 옆면 직선이 0이 되는 지점(높이 − 위 반지름)이고, 너비 절반도 넘을 수 없다.
-    static func maxBottomRadius(width: CGFloat, height: CGFloat, topRadius: CGFloat) -> CGFloat {
-        max(0, min(height - topRadius, width / 2))
-    }
 
     func path(in rect: CGRect) -> Path {
         // 원을 베지어 곡선으로 근사할 때 쓰는 상수
         let k: CGFloat = 0.5523
-        let left = rect.midX - width / 2 - outset
-        let right = rect.midX + width / 2 + outset
-        let bottom = height + outset
-        let tr = max(0, topRadius - outset)
-        let br = max(0, min(bottomRadius + outset, (right - left) / 2, bottom - tr))
+        let left = rect.midX - width / 2
+        let right = rect.midX + width / 2
+        let bottom = height
+        let tr = max(0, topRadius)
+        let br = max(0, min(bottomRadius, (right - left) / 2, bottom - tr))
 
         var p = Path()
         // 왼쪽 위: 화면 테두리에서 옆면으로 오목하게 꺾임
