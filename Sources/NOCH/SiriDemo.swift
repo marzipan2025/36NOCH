@@ -356,7 +356,7 @@ struct DropPanelView: View {
                     HStack(alignment: .top) {
                         if showNow {
                             // "지금" 버튼 롤오버(또는 눌러서 잠근 동안): 시계 자리에 지금 시각(HH:MM:SS)을 퇴근 알림과 같은 하늘색으로,
-                            // 아래에는 타이머 버튼. 잠근 동안만 누를 수 있고, 롤오버만 할 때나 타이머가 도는 중엔 흐리게(0.5) 보여 주기만
+                            // 아래에는 타이머 버튼. 잠근 동안만 누를 수 있고, 롤오버만 할 때나 타이머가 도는 중엔 흐리게(0.2) 보여 주기만
                             let text = Self.nowClock(now)
                             clockColumn(text: text, title: "", color: Self.sky, colonBlink: true, now: now,
                                         width: clockWidth(for: text),
@@ -467,7 +467,7 @@ struct DropPanelView: View {
                             }
                         }
                     }
-                    .opacity(enabled ? 1 : 0.5)
+                    .opacity(enabled ? 1 : 0.2)
                 } else {
                     Text(title)
                         .lineLimit(2)  // 길면 두 줄까지만, 넘치는 끝은 말줄임(…)
