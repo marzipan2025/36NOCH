@@ -965,7 +965,8 @@ extension DropTuning {
         let n = CGFloat(calendar.accounts.count)
         let list = 16 + AccountPicker.titleGap + n * AccountPicker.rowHeight + n * AccountPicker.rowGap
             + AccountPicker.laterHeight  // 맨 끝 "Later"
-        let needed = textTop + list + 18
+        // 목록이 다 들어가는 높이에서 100 낮춘다. 넘치는 만큼은 안에서 스크롤된다.
+        let needed = textTop + list + 18 - 100
         let limit = min(metrics.screen.frame.height / 2, 620 - 40) - top
         return max(popupHeight, min(needed, limit))
     }

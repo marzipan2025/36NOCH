@@ -17,8 +17,7 @@ struct AccountPicker: View {
     static let rowHeight: CGFloat = 58
     /// 목록 끝 "Later" 줄 높이(상자 없음)
     static let laterHeight: CGFloat = 42
-    /// 계정 상자와 팝업 좌우 끝 사이, 상자 안 좌우·위아래 여백
-    static let sideMargin: CGFloat = 24
+    /// 상자 안 좌우·위아래 여백
     static let innerH: CGFloat = 16
     static let innerV: CGFloat = 11
 
@@ -42,18 +41,27 @@ struct AccountPicker: View {
                     calendar.openInternetAccounts()
                 }
             } else {
-                ScrollView(.vertical, showsIndicators: false) {
-                    VStack(alignment: .leading, spacing: Self.rowGap) {
-                        ForEach(calendar.accounts) { row($0) }
-                        laterRow
+                ScrollViewReader { proxy in
+                    ScrollView(.vertical, showsIndicators: false) {
+                        VStack(alignment: .leading, spacing: Self.rowGap) {
+                            ForEach(calendar.accounts) { row($0) }
+                            laterRow
+                        }
+                    }
+                    .defaultScrollAnchor(.top)
+                    // 노치가 커지는 동안 스크롤 뷰 높이가 바뀌면서 중간부터 보이는 일이 있어, 열 때마다 맨 위로 되돌린다
+                    .onAppear {
+                        guard let first = calendar.accounts.first?.id else { return }
+                        DispatchQueue.main.async { proxy.scrollTo(first, anchor: .top) }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { proxy.scrollTo(first, anchor: .top) }
                     }
                 }
-                .defaultScrollAnchor(.top)  // 처음엔 맨 위부터
 
             }
         }
-        // 팝업 글 여백(22)에서 2 더 들여, 계정 상자가 팝업 좌우 끝에서 24 떨어지게. 위 제목도 상자 끝에 맞춘다.
-        .padding(.horizontal, Self.sideMargin - 22)
+        // 상자 안 글자(계정 이름·위 제목·Choose later)가 노치 글 줄(= 왼쪽 위 원 버튼의 왼쪽 끝)에서 시작하도록
+        // 상자를 안 여백(innerH)만큼 바깥으로 낸다.
+        .padding(.horizontal, -Self.innerH)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
 
