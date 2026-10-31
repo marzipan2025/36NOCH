@@ -74,7 +74,11 @@ final class DropTuning: ObservableObject {
     /// 바뀔 때마다 패널이 열기/닫기 모션을 한다. 마우스 위치(SiriDemo)나 설정창 버튼이 바꾼다.
     @Published var isOpen = false
     /// now 버튼을 눌러 잠그면 true: 마우스가 나가도 닫지 않는다. 다시 누르면 풀리고, 그 뒤 마우스가 나가면 닫힌다(저장 안 함).
-    @Published var locked = CommandLine.arguments.contains("--test-locked")  // 시험용: `--test-open --test-locked`
+    @Published var locked = CommandLine.arguments.contains("--test-locked") || CommandLine.arguments.contains("--test-timer")  // 시험용: `--test-open --test-locked`
+    /// 잠근 화면의 버튼(+3, +5, :40, :30, :00)으로 건 타이머가 끝나는 시각과 제목. 끝나면(00:00 깜빡임 뒤) 잠금과 함께 풀린다.
+    /// 시험용: `--test-timer` 이면 띄우자마자 3분 타이머
+    @Published var timerEnd: Date? = CommandLine.arguments.contains("--test-timer") ? Date().addingTimeInterval(180) : nil
+    var timerTitle = CommandLine.arguments.contains("--test-timer") ? "3-Minute Timer" : ""
 
     /// 11차 설정(= 기본값): 2026-10-31 집 맥. 10차에서 하단 캡슐 좌우·아래 여백 31.5 → 36.
     /// 조절하다가 이 값으로 되돌릴 때 쓴다.
@@ -342,24 +346,37 @@ struct DropPanelView: View {
                     let now = context.date
                     // 퇴근 알림은 닫힘 모션이 끝날 때까지(10초 + 2초) 그대로 보여 준다
                     let home = GoHome.isTime(now, seconds: GoHome.seconds + 2)
-                    // now 버튼에 마우스가 있거나 눌러서 잠근 동안: 시계·날짜를 지금 시각(하늘색)으로. 잠근 동안엔 아래에 "NOCH Locked."
-                    let showNow = hoverNow || tuning.locked
+                    // 시험용: `--test-long-countdown` 이면 회의를 12시간 뒤로 밀어 HH:MM:SS를 보여 준다
+                    let start = calendar.next.map { $0.start.addingTimeInterval(CommandLine.arguments.contains("--test-long-countdown") ? 12 * 3600 : 0) }
+                    // 우선순위: 10분 이하 남은 회의 > 타이머 > 잠근 지금 시각 > 퇴근 알림 > 그 밖의 회의. now 버튼 롤오버는 늘 지금 시각.
+                    let meetingFirst = start.map { $0.timeIntervalSince(now) <= 10 * 60 && $0.timeIntervalSince(now) > -CalendarFeed.blink } ?? false
+                    let timerLeft = tuning.timerEnd?.timeIntervalSince(now)
+                    let showTimer = !hoverNow && !meetingFirst && timerLeft != nil
+                    let showNow = hoverNow || (tuning.locked && !meetingFirst && timerLeft == nil)
                     HStack(alignment: .top) {
                         if showNow {
-                            // "지금" 버튼 롤오버(또는 눌러서 잠근 동안): 시계 자리에 지금 시각(HH:MM:SS)을 퇴근 알림과 같은 하늘색으로, 아래 제목은 없음
+                            // "지금" 버튼 롤오버(또는 눌러서 잠근 동안): 시계 자리에 지금 시각(HH:MM:SS)을 퇴근 알림과 같은 하늘색으로,
+                            // 아래에는 타이머 버튼. 잠근 동안만 누를 수 있고, 롤오버만 할 때나 타이머가 도는 중엔 흐리게(0.5) 보여 주기만
                             let text = Self.nowClock(now)
-                            clockColumn(text: text, title: tuning.locked ? Self.lockedTitle : "", color: Self.sky, colonBlink: true, now: now,
-                                        width: clockWidth(for: text))
-                        } else if home {
+                            clockColumn(text: text, title: "", color: Self.sky, colonBlink: true, now: now,
+                                        width: clockWidth(for: text),
+                                        timerButtons: tuning.locked && timerLeft == nil)
+                        } else if showTimer, let end = tuning.timerEnd, let left = timerLeft {
+                            // 타이머: 회의 카운트다운과 같은 모양(5분 이하면 붉게, 끝나면 00:00을 10초 깜빡임)
+                            let blinking = left <= 0
+                            let text = countdownText(to: end, now: now)
+                            clockColumn(text: text, title: tuning.timerTitle,
+                                        color: clockColor(alert: left <= 5 * 60, left: left),
+                                        clockVisible: !blinking || Int(now.timeIntervalSinceReferenceDate * 2) % 2 == 0,
+                                        colonBlink: left > 0, now: now, width: clockWidth(for: text))
+                        } else if home && !meetingFirst {
                             // 평일 18시: "18:00"을 하늘색으로, 열려 있는 10초 동안 회의 시작 00:00처럼 깜빡인다
                             let blinking = GoHome.isTime(now, seconds: GoHome.seconds)
                             clockColumn(text: GoHome.clock, title: "Go home Now!", color: Self.sky,
                                         clockVisible: !blinking || Int(now.timeIntervalSinceReferenceDate * 2) % 2 == 0)
-                        } else if let next = calendar.next {
+                        } else if let next = calendar.next, let start {
                             // 임시: 다음 회의까지 남은 시간. 알림으로 열려 있는 동안만 붉게:
                             // 10분 전 10초간, 5분 전부터 시작 뒤 00:00을 깜빡이는 10초까지
-                            // 시험용: `--test-long-countdown` 이면 회의를 12시간 뒤로 밀어 HH:MM:SS를 보여 준다
-                            let start = next.start.addingTimeInterval(CommandLine.arguments.contains("--test-long-countdown") ? 12 * 3600 : 0)
                             let left = start.timeIntervalSince(now)
                             let alert = left <= 5 * 60 || (left > 10 * 60 - 10 && left <= 10 * 60)
                             let blinking = left <= 0 && left > -CalendarFeed.blink
@@ -383,7 +400,10 @@ struct DropPanelView: View {
                             if showNow {
                                 Text(Self.nowDay(now)).multilineTextAlignment(.trailing).fixedSize()
                                     .foregroundStyle(Color(red: Self.sky.r, green: Self.sky.g, blue: Self.sky.b))
-                            } else if let when = home ? GoHome.when(now) : calendar.nextWhen {
+                            } else if showTimer, let end = tuning.timerEnd {
+                                Text("Ends at\n" + Self.nowClock(end)).multilineTextAlignment(.trailing).fixedSize()
+                                    .foregroundStyle(Color(red: 0xcc / 255, green: 0xcc / 255, blue: 0xdd / 255))
+                            } else if let when = home && !meetingFirst ? GoHome.when(now) : calendar.nextWhen {
                                 Text(when.day + "\n" + when.time).multilineTextAlignment(.trailing).fixedSize()
                                     .foregroundStyle(Color(red: 0xcc / 255, green: 0xcc / 255, blue: 0xdd / 255))  // #ccccdd
                             }
@@ -394,7 +414,9 @@ struct DropPanelView: View {
                                 .offset(x: 1)  // 날짜 글 오른쪽 끝보다 1 오른쪽
                                 .contentShape(Rectangle().inset(by: -6))
                                 .onHover { hoverNow = $0 }
-                                .onTapGesture { tuning.locked.toggle() }  // 잠그기/풀기
+                                .onTapGesture {  // 잠그기/풀기. 풀면 돌던 타이머도 바로 끈다
+                                    if tuning.locked { tuning.locked = false; tuning.timerEnd = nil } else { tuning.locked = true }
+                                }
                         }
                     }
                 }
@@ -419,7 +441,8 @@ struct DropPanelView: View {
     /// 제목은 늘 시계 색을 70%로 어둡게 한 색.
     private func clockColumn(text: String, title: String, color: (r: Double, g: Double, b: Double),
                              clockVisible: Bool = true, colonBlink: Bool = false, now: Date = Date(),
-                             width: CGFloat? = nil, onTitle: (() -> Void)? = nil) -> some View {
+                             width: CGFloat? = nil, onTitle: (() -> Void)? = nil,
+                             timerButtons: Bool? = nil) -> some View {
         let size = ClockFont.size(for: text, width: width ?? tuning.countdownWidth)
         let small = NSFont.systemFont(ofSize: tuning.textSize, weight: .light)
         let smallCapTop = small.ascender - small.capHeight  // 작은 글 프레임 위 ~ 글자 위 끝
@@ -432,21 +455,52 @@ struct DropPanelView: View {
                 .foregroundStyle(Color(red: color.r, green: color.g, blue: color.b))
                 .offset(x: tuning.countdownX)
                 .opacity(clockVisible ? 1 : 0)
-            Text(title)
-                .font(.system(size: titleSize, weight: .light))
-                .lineLimit(2)  // 길면 두 줄까지만, 넘치는 끝은 말줄임(…)
-                .truncationMode(.tail)
-                .foregroundStyle(titleColor(color, hover: onTitle != nil && hoverTitle))
-                .offset(x: 3, y: 2)  // 글 줄에서 오른쪽으로 3(−1 → 1 → 3), 아래로 2
-                .onHover { hoverTitle = $0 }
-                .onTapGesture { onTitle?() }
+            Group {
+                if let enabled = timerButtons {
+                    // 제목 자리에 타이머 버튼(글자만), 간격 12
+                    HStack(spacing: 12) {
+                        ForEach(Array(Self.timerChoices(now).enumerated()), id: \.offset) { _, choice in
+                            TimerButton(label: choice.label, color: titleColor(color, hover: false),
+                                        hoverColor: titleColor(color, hover: true), enabled: enabled) {
+                                tuning.timerEnd = choice.end
+                                tuning.timerTitle = choice.title
+                            }
+                        }
+                    }
+                    .opacity(enabled ? 1 : 0.5)
+                } else {
+                    Text(title)
+                        .lineLimit(2)  // 길면 두 줄까지만, 넘치는 끝은 말줄임(…)
+                        .truncationMode(.tail)
+                        .foregroundStyle(titleColor(color, hover: onTitle != nil && hoverTitle))
+                        .onHover { hoverTitle = $0 }
+                        .onTapGesture { onTitle?() }
+                }
+            }
+            .font(.system(size: titleSize, weight: .light))
+            .offset(x: 3, y: 2)  // 글 줄에서 오른쪽으로 3(−1 → 1 → 3), 아래로 2
         }
         // 숫자 위 끝이 오른쪽 날짜 글자 위 끝과 같은 높이에 오도록 끌어올린다
         .padding(.top, smallCapTop - size * ClockFont.capTop - tuning.countdownLift)
     }
 
-    /// now 버튼으로 잠근 동안 시계 아래 제목 자리에 보이는 글
-    private static let lockedTitle = "NOCH Locked."
+    /// 잠근 화면의 타이머 버튼: +3, +5분 / 다음 10분 단위(:40 등) / 다음 :30 / 다음 정각.
+    /// 시각 버튼은 늘 지금보다 뒤에 오는 그 분(01:30:00에 :30을 누르면 02:30). 5분 이하로 남으면 곧바로 붉은 화면이 된다.
+    private static func timerChoices(_ now: Date) -> [(label: String, end: Date, title: String)] {
+        let cal = Foundation.Calendar.current
+        func next(minute: Int) -> Date {
+            cal.nextDate(after: now, matching: DateComponents(minute: minute, second: 0), matchingPolicy: .nextTime) ?? now
+        }
+        func mark(_ minute: Int) -> (label: String, end: Date, title: String) {
+            let end = next(minute: minute)
+            let c = cal.dateComponents([.hour, .minute], from: end)
+            return (String(format: ":%02d", minute), end, String(format: "Until %02d:%02d", c.hour ?? 0, c.minute ?? 0))
+        }
+        let ten = ((cal.component(.minute, from: now) / 10 + 1) * 10) % 60
+        return [("+3", now.addingTimeInterval(180), "3-Minute Timer"),
+                ("+5", now.addingTimeInterval(300), "5-Minute Timer"),
+                mark(ten), mark(30), mark(0)]
+    }
 
     /// 하늘색 #87ceeb: 퇴근 알림 시계, "지금" 버튼 롤오버
     private static let sky: (r: Double, g: Double, b: Double) = (0x87 / 255, 0xce / 255, 0xeb / 255)
@@ -932,7 +986,16 @@ final class SiriDemo: NSObject {
         // 회의 알림도 마찬가지로 마우스와 상관없이 펼친 채 유지한다.
         // 팝업에서 캘린더 계정을 고르는 동안도 열어 둔다(고를 계정이 있을 때만. 권한 거부·계정 없음은 안내 글만이라 붙들지 않는다).
         let choosing = calendar.picking && calendar.status != .denied && !calendar.accounts.isEmpty
-        let alerting = meetingAlert() || GoHome.isTime(Date(), seconds: GoHome.seconds) || choosing
+        // 타이머: 끝나고 00:00을 10초 깜빡인 뒤 잠금과 함께 푼다. 5분 이하로 남으면 회의처럼 열어 둔다
+        var timing = false
+        if let end = t.timerEnd {
+            let left = end.timeIntervalSinceNow
+            if left <= -CalendarFeed.blink { t.timerEnd = nil; t.locked = false } else { timing = left <= 5 * 60 }
+        }
+        // 퇴근 알림은 우선순위가 가장 낮아, 10분 이하 남은 회의나 타이머가 있으면 열지 않는다
+        let meetingSoon = calendar.next.map { $0.start.timeIntervalSinceNow <= 10 * 60 } ?? false
+        let homeAlert = GoHome.isTime(Date(), seconds: GoHome.seconds) && !meetingSoon && t.timerEnd == nil
+        let alerting = meetingAlert() || timing || homeAlert || choosing
         if alerting && !t.isOpen { t.isOpen = true }
         let holding = alerting || t.locked || (t.holdWhileSettings && (controlWindow?.isVisible ?? false))
         if !holding {
@@ -1042,5 +1105,23 @@ extension DropTuning {
         let needed = textTop + list + 18 - 100
         let limit = min(metrics.screen.frame.height / 2, 620 - 40) - top
         return max(popupHeight, min(needed, limit))
+    }
+}
+
+/// 잠근 화면의 타이머 버튼(글자만). 마우스를 올리면 제목처럼 조금 밝아진다
+private struct TimerButton: View {
+    let label: String
+    let color: Color
+    let hoverColor: Color
+    let enabled: Bool
+    let action: () -> Void
+    @State private var hover = false
+
+    var body: some View {
+        Text(label)
+            .foregroundStyle(enabled && hover ? hoverColor : color)
+            .contentShape(Rectangle().inset(by: -4))
+            .onHover { hover = $0 }
+            .onTapGesture { if enabled { action() } }
     }
 }
