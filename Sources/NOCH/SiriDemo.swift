@@ -409,6 +409,8 @@ struct DropPanelView: View {
                 .opacity(clockVisible ? 1 : 0)
             Text(title)
                 .font(.system(size: titleSize, weight: .light))
+                .lineLimit(2)  // 길면 두 줄까지만, 넘치는 끝은 말줄임(…)
+                .truncationMode(.tail)
                 .foregroundStyle(titleColor(color, hover: onTitle != nil && hoverTitle))
                 .offset(x: 3, y: 2)  // 글 줄에서 오른쪽으로 3(−1 → 1 → 3), 아래로 2
                 .onHover { hoverTitle = $0 }
