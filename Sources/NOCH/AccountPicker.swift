@@ -24,45 +24,71 @@ struct AccountPicker: View {
     private static let light = Color(red: 0xcc / 255, green: 0xcc / 255, blue: 0xdd / 255)  // #ccccdd
     private static let dim = Color(red: 0x9a / 255, green: 0x9c / 255, blue: 0xb8 / 255)    // #9A9CB8
 
+    /// 목록이 노치 전체를 쓰도록 스크롤 영역은 노치 위 끝부터 아래 끝까지 깔고, 첫 화면 자리는 안 여백으로 잡는다.
+    /// topInset: 노치 위 끝 ~ 제목 위 끝, bottomInset: 마지막 줄 아래 여백, fadeTop: 이 높이(실제 노치 아래 끝)부터 위로는 목록을 흐리게 지운다.
+    var topInset: CGFloat = 0
+    var bottomInset: CGFloat = 18
+    var fadeTop: CGFloat = 0
+
     var body: some View {
-        VStack(alignment: .leading, spacing: Self.titleGap) {
-            Text(calendar.status == .denied ? "Calendar access" : "Choose calendar account")
-                .font(.system(size: textSize, weight: .light))
-                .foregroundStyle(Self.light)
-                .padding(.leading, Self.innerH)  // 계정 상자 안 글자와 왼쪽을 맞춘다
-            if calendar.status == .denied {
-                // 누르면 시스템 설정 > 개인정보 보호 및 보안 > 캘린더
-                message("36NOCH needs access to your calendars. Click to open System Settings.") {
-                    calendar.openPrivacySettings()
+        Group {
+            if calendar.status == .denied || calendar.accounts.isEmpty {
+                VStack(alignment: .leading, spacing: Self.titleGap) {
+                    title
+                    if calendar.status == .denied {
+                        // 누르면 시스템 설정 > 개인정보 보호 및 보안 > 캘린더
+                        message("36NOCH needs access to your calendars. Click to open System Settings.") {
+                            calendar.openPrivacySettings()
+                        }
+                    } else {
+                        // 누르면 시스템 설정 > 인터넷 계정
+                        message("No accounts in Calendar yet. Click to add one in System Settings.") {
+                            calendar.openInternetAccounts()
+                        }
+                    }
                 }
-            } else if calendar.accounts.isEmpty {
-                // 누르면 시스템 설정 > 인터넷 계정
-                message("No accounts in Calendar yet. Click to add one in System Settings.") {
-                    calendar.openInternetAccounts()
-                }
+                .padding(.top, topInset)
             } else {
+                // 제목도 목록과 함께 스크롤된다. 스크롤 영역 경계가 노치 모양 끝과 같아서 중간에 잘린 줄이 보이지 않는다.
                 ScrollViewReader { proxy in
                     ScrollView(.vertical, showsIndicators: false) {
                         VStack(alignment: .leading, spacing: Self.rowGap) {
+                            title.padding(.bottom, Self.titleGap - Self.rowGap).id("top")
                             ForEach(calendar.accounts) { row($0) }
                             laterRow
                         }
+                        .padding(.top, topInset)
+                        .padding(.bottom, bottomInset)
                     }
                     .defaultScrollAnchor(.top)
                     // 노치가 커지는 동안 스크롤 뷰 높이가 바뀌면서 중간부터 보이는 일이 있어, 열 때마다 맨 위로 되돌린다
                     .onAppear {
-                        guard let first = calendar.accounts.first?.id else { return }
-                        DispatchQueue.main.async { proxy.scrollTo(first, anchor: .top) }
-                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { proxy.scrollTo(first, anchor: .top) }
+                        DispatchQueue.main.async { proxy.scrollTo("top", anchor: .top) }
+                        DispatchQueue.main.asyncAfter(deadline: .now() + 0.7) { proxy.scrollTo("top", anchor: .top) }
+                    }
+                    // 위로 올라간 줄은 실제 노치 아래 끝에서 첫 화면 제목 자리까지 흐려지며 검정 띠 속으로 사라진다
+                    .mask {
+                        VStack(spacing: 0) {
+                            Color.clear.frame(height: fadeTop)
+                            LinearGradient(colors: [.clear, .black], startPoint: .top, endPoint: .bottom)
+                                .frame(height: max(1, topInset - fadeTop))
+                            Color.black
+                        }
                     }
                 }
-
             }
         }
         // 상자 안 글자(계정 이름·위 제목·Choose later)가 노치 글 줄(= 왼쪽 위 원 버튼의 왼쪽 끝)에서 시작하도록
         // 상자를 안 여백(innerH)만큼 바깥으로 낸다.
         .padding(.horizontal, -Self.innerH)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    private var title: some View {
+        Text(calendar.status == .denied ? "Calendar access" : "Choose calendar account")
+            .font(.system(size: textSize, weight: .light))
+            .foregroundStyle(Self.light)
+            .padding(.leading, Self.innerH)  // 계정 상자 안 글자와 왼쪽을 맞춘다
     }
 
     /// 목록 맨 끝: 평소엔 상자 없이 "Choose later" 글자만(검정, 계정 이름과 같은 크기, 세미볼드).

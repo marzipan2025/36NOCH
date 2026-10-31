@@ -365,10 +365,13 @@ struct DropPanelView: View {
                 // 초 경계에서 시작해 숫자와 콜론이 같은 순간에 바뀌게 한다.
                 // 계정을 고르는 중이면 시계 자리에 계정 목록(AccountPicker)
                 Group { if calendar.picking {
+                    // 스크롤 영역은 노치 위 끝 ~ 아래 끝 전체(아래 .padding(.top)을 되돌린다). 첫 화면은 글 줄 자리에서 시작하고
+                    // 마지막 줄 아래 여백은 18. 계정마다 검정 상자에 담기므로 아래 투명한 유리까지 내려가도 읽힌다.
                     AccountPicker(calendar: calendar, textSize: tuning.textSize,
-                                  onLater: { calendar.later(); tuning.isOpen = false })
-                        // 계정마다 검정 상자에 담기므로 아래 투명한 유리까지 내려가도 된다. 아래 여백은 18.
-                        .frame(height: max(0, popupSize.height - tuning.contentTop(metrics: metrics) - 18))
+                                  onLater: { calendar.later(); tuning.isOpen = false },
+                                  topInset: tuning.contentTop(metrics: metrics), bottomInset: 18, fadeTop: metrics.height)
+                        .frame(height: popupSize.height)
+                        .padding(.top, -tuning.contentTop(metrics: metrics))
                 } else {
                 TimelineView(.periodic(from: Date(timeIntervalSinceReferenceDate: Date().timeIntervalSinceReferenceDate.rounded(.down)), by: 0.5)) { context in
                     let now = context.date
