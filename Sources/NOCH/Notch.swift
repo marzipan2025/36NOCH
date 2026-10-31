@@ -117,6 +117,9 @@ final class NotchPanel: NSPanel {
         ignoresMouseEvents = true
         level = .screenSaver
         collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
+        // 창이 처음 나타날 때 macOS 기본 등장 애니메이션(살짝 작게 시작해 커짐)을 끈다.
+        // 켜 두면 앱을 켤 때 넓은 노치가 화면 위 끝에서 잠깐 떨어졌다가 붙어 보였다.
+        animationBehavior = .none
     }
 
     /// 화면 위 가운데에 붙는 패널 프레임
