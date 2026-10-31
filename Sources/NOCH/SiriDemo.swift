@@ -443,10 +443,25 @@ struct DropPanelView: View {
         return Color(red: ch(c.r), green: ch(c.g), blue: ch(c.b))
     }
 
-    /// 회의 제목을 누르면 캘린더 앱에서 그 일정을 연다. 주소가 없거나 열지 못하면 캘린더 앱만 띄운다.
+    /// 회의 제목을 누르면 캘린더 앱에서 그 일정의 상세 정보를 연다.
+    /// 일정 주소(ical://ekevent)는 일정을 고르기만 하고, 일 보기일 때만 오른쪽에 상세 정보가 뜬다.
+    /// 그래서 먼저 AppleScript로 일 보기로 바꾼 뒤 주소를 연다(처음 한 번 자동화 허용을 묻는다).
+    /// 주소가 없거나 열지 못하면 캘린더 앱만 띄운다.
     private func openCalendarApp(_ event: URL? = nil) {
-        if let event, NSWorkspace.shared.open(event) { return }
-        NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Calendar.app"))
+        guard let event else {
+            NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Calendar.app"))
+            return
+        }
+        DispatchQueue.global(qos: .userInitiated).async {
+            var error: NSDictionary?
+            NSAppleScript(source: "tell application \"Calendar\" to switch view to day view")?.executeAndReturnError(&error)
+            if let error { FileHandle.standardError.write("캘린더: 일 보기로 못 바꿈 \(error)\n".data(using: .utf8)!) }
+            DispatchQueue.main.async {
+                if !NSWorkspace.shared.open(event) {
+                    NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Calendar.app"))
+                }
+            }
+        }
     }
 
     /// 팝업 자리에 놓인 검정 덮개. 하단 영역 모양만큼은 오려 내서 그 안에 검정이 들어오지 않게 한다.

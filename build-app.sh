@@ -38,6 +38,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>NSHighResolutionCapable</key><true/>
     <key>NSCalendarsFullAccessUsageDescription</key><string>노치 팝업에 구글 캘린더 일정을 보여 주려고 캘린더를 읽습니다.</string>
     <key>NSCalendarsUsageDescription</key><string>노치 팝업에 구글 캘린더 일정을 보여 주려고 캘린더를 읽습니다.</string>
+    <key>NSAppleEventsUsageDescription</key><string>회의 제목을 누르면 캘린더 앱을 일 보기로 바꿔 그 일정의 상세 정보를 엽니다.</string>
 </dict>
 </plist>
 PLIST
