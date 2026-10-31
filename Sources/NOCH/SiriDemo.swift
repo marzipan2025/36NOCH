@@ -73,6 +73,8 @@ final class DropTuning: ObservableObject {
 
     /// 바뀔 때마다 패널이 열기/닫기 모션을 한다. 마우스 위치(SiriDemo)나 설정창 버튼이 바꾼다.
     @Published var isOpen = false
+    /// now 버튼을 눌러 잠그면 true: 마우스가 나가도 닫지 않는다. 다시 누르면 풀리고, 그 뒤 마우스가 나가면 닫힌다(저장 안 함).
+    @Published var locked = CommandLine.arguments.contains("--test-locked")  // 시험용: `--test-open --test-locked`
 
     /// 11차 설정(= 기본값): 2026-10-31 집 맥. 10차에서 하단 캡슐 좌우·아래 여백 31.5 → 36.
     /// 조절하다가 이 값으로 되돌릴 때 쓴다.
@@ -344,12 +346,12 @@ struct DropPanelView: View {
                         if hoverNow {
                             // "지금" 버튼 롤오버: 시계 자리에 지금 시각(HH:MM:SS)을 퇴근 알림과 같은 하늘색으로, 아래 제목은 없음
                             let text = Self.nowClock(now)
-                            clockColumn(text: text, title: "", color: Self.sky, colonBlink: true, now: now,
+                            clockColumn(text: text, title: tuning.locked ? Self.lockedTitle : "", color: Self.sky, colonBlink: true, now: now,
                                         width: clockWidth(for: text))
                         } else if home {
                             // 평일 18시: "18:00"을 하늘색으로, 열려 있는 10초 동안 회의 시작 00:00처럼 깜빡인다
                             let blinking = GoHome.isTime(now, seconds: GoHome.seconds)
-                            clockColumn(text: GoHome.clock, title: "Go home Now!", color: Self.sky,
+                            clockColumn(text: GoHome.clock, title: tuning.locked ? Self.lockedTitle : "Go home Now!", color: Self.sky,
                                         clockVisible: !blinking || Int(now.timeIntervalSinceReferenceDate * 2) % 2 == 0)
                         } else if let next = calendar.next {
                             // 임시: 다음 회의까지 남은 시간. 알림으로 열려 있는 동안만 붉게:
@@ -360,14 +362,14 @@ struct DropPanelView: View {
                             let alert = left <= 5 * 60 || (left > 10 * 60 - 10 && left <= 10 * 60)
                             let blinking = left <= 0 && left > -CalendarFeed.blink
                             let text = countdownText(to: start, now: now)
-                            clockColumn(text: text, title: Self.testTitle ?? calendar.summary,
+                            clockColumn(text: text, title: tuning.locked ? Self.lockedTitle : Self.testTitle ?? calendar.summary,
                                         color: clockColor(alert: alert, left: left),
                                         clockVisible: !blinking || Int(now.timeIntervalSinceReferenceDate * 2) % 2 == 0,
                                         colonBlink: left > 0 && left < 100 * 3600, now: now,
                                         width: clockWidth(for: text),
-                                        onTitle: { openCalendarApp(next.showURL) })
+                                        onTitle: tuning.locked ? nil : { openCalendarApp(next.showURL) })
                         } else {
-                            Text(calendar.summary)
+                            Text(tuning.locked ? Self.lockedTitle : calendar.summary)
                                 .foregroundStyle(Color(red: 0xcc / 255, green: 0xcc / 255, blue: 0xdd / 255))
                                 .onTapGesture {
                                     if calendar.status == .noAccount || calendar.status == .denied { calendar.startPicking() }
@@ -390,6 +392,7 @@ struct DropPanelView: View {
                                 .offset(x: 1)  // 날짜 글 오른쪽 끝보다 1 오른쪽
                                 .contentShape(Rectangle().inset(by: -6))
                                 .onHover { hoverNow = $0 }
+                                .onTapGesture { tuning.locked.toggle() }  // 잠그기/풀기
                         }
                     }
                 }
@@ -439,6 +442,9 @@ struct DropPanelView: View {
         // 숫자 위 끝이 오른쪽 날짜 글자 위 끝과 같은 높이에 오도록 끌어올린다
         .padding(.top, smallCapTop - size * ClockFont.capTop - tuning.countdownLift)
     }
+
+    /// now 버튼으로 잠근 동안 시계 아래 제목 자리에 보이는 글
+    private static let lockedTitle = "NOCH Locked."
 
     /// 하늘색 #87ceeb: 퇴근 알림 시계, "지금" 버튼 롤오버
     private static let sky: (r: Double, g: Double, b: Double) = (0x87 / 255, 0xce / 255, 0xeb / 255)
@@ -926,7 +932,7 @@ final class SiriDemo: NSObject {
         let choosing = calendar.picking && calendar.status != .denied && !calendar.accounts.isEmpty
         let alerting = meetingAlert() || GoHome.isTime(Date(), seconds: GoHome.seconds) || choosing
         if alerting && !t.isOpen { t.isOpen = true }
-        let holding = alerting || (t.holdWhileSettings && (controlWindow?.isVisible ?? false))
+        let holding = alerting || t.locked || (t.holdWhileSettings && (controlWindow?.isVisible ?? false))
         if !holding {
             if t.isOpen {
                 if !keepRect(screen: sf, metrics: metrics, margin: t.keepMargin).contains(mouse) { t.isOpen = false }
