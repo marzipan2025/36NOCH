@@ -323,6 +323,10 @@ struct DropPanelView: View {
             Color.clear
                 .frame(width: shapeFrameWidth, height: popupSize.height)
                 .glassEffect(glass, in: popupShape)
+                // 유리는 모양이 바뀔 때 자기 방식(둥근 사각형)으로 따로 움직여서, 열고 닫기를 빠르게 되풀이하면
+                // 검정 노치보다 넓고 위 모서리가 볼록하게 둥근 유리가 드러나 노치가 화면 위에서 떨어져 보였다.
+                // SwiftUI가 매 프레임 그리는 같은 모양으로 잘라 늘 검정 노치 안에만 보이게 한다.
+                .mask { popupShape.fill(.black).frame(width: shapeFrameWidth, height: popupSize.height) }
 
             // 덧칠: 유리 아래 검정만으로는 유리가 빛을 더해 덜 검게 보인다. 같은 모양을 유리 위에 반투명으로 한 번 더.
             // 위에 덮는 만큼 유리 질감도 가려지므로 불투명도로 맞춘다(1이면 처음의 매트한 평면과 같아짐).
@@ -786,6 +790,14 @@ final class SiriDemo: NSObject {
         // 시험용: `--test-settings` 로 띄우면 설정창을 바로 연다
         if CommandLine.arguments.contains("--test-settings") { control.orderFrontRegardless() }
         // 시험용: `--test-settings --test-open` 이면 2초 뒤 노치를 열고, 설정창이 떠 있는 동안 펼친 채 둔다
+        // 시험용: `--test-settings --test-flicker` 면 2초 뒤부터 6초 동안 0.1~0.35초 간격으로 열고 닫기를 반복한다(마우스를 넣었다 뺐다 하는 흉내)
+        if CommandLine.arguments.contains("--test-flicker") {
+            var at = 2.0
+            while at < 8 {
+                DispatchQueue.main.asyncAfter(deadline: .now() + at) { [weak self] in self?.tuning.isOpen.toggle() }
+                at += Double.random(in: 0.1...0.35)
+            }
+        }
         if CommandLine.arguments.contains("--test-open") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 2) { [weak self] in self?.tuning.isOpen = true }
         }
