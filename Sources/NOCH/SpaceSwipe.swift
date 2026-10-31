@@ -1,7 +1,8 @@
 import AppKit
 import CoreGraphics
 
-/// 트랙패드로 데스크탑(스페이스)을 좌우로 넘기는 스와이프를 지켜보다가, 옆 데스크탑이 threshold(30%)만큼 들어오면 알린다.
+/// 트랙패드로 데스크탑(스페이스)을 좌우로 넘기는 스와이프를 지켜보다가, 옆 데스크탑이 threshold(30%)만큼 들어오거나
+/// 그 전에 손가락을 떼어 넘어가기로 정해지면(관성으로 넘어감) 알린다.
 /// 데스크탑 전환 공식 알림(activeSpaceDidChangeNotification)은 전환이 거의 끝난 뒤에 오므로, 넘어가기 전에 닫으려고 쓴다.
 ///
 /// 공개 API가 없어서 Dock이 받는 스와이프 이벤트(비공개 종류 30)를 듣기 전용 이벤트 탭으로 읽는다.
@@ -83,8 +84,11 @@ final class SpaceSwipeWatcher {
         let phase = event.getIntegerValueField(Self.phaseField)
         if Self.log { say("스와이프: motion \(motion) phase \(phase) progress \(progress)") }
         if phase == 1 { fired = false }
-        guard motion == 1, !fired, abs(progress) >= threshold else { return }
+        // 빠르게 휙 넘기면 손가락을 뗄 때까지 진행이 0.15~0.2에 그치고 나머지는 관성으로 넘어간다(2026-11-01 집 맥 기록).
+        // 손가락을 뗄 때 넘어갈 스와이프는 단계 4(끝), 제자리로 돌아갈 스와이프는 8(취소)로 오므로 4에서도 닫는다.
+        guard motion == 1, !fired, abs(progress) >= threshold || phase == 4 else { return }
         fired = true
+        if Self.log { say("스와이프: \(progress)에서 닫기") }
         onSwipe()
     }
 }
