@@ -74,7 +74,7 @@ final class DropTuning: ObservableObject {
     // 다음 회의까지 남은 시간(Distro Mix, 금색). 너비를 고정하고, 글자 수가 줄면 그만큼 글자가 커져 아래로 늘어난다.
     let countdownWidth: CGFloat = 204     // 시계 너비. 204면 8자리(70:02:31)가 약 49pt
     let countdownGap: CGFloat = 12        // 숫자 아래 끝 ~ 제목 글자 위 끝
-    let countdownX: CGFloat = -9          // 남은 시간만 좌우로 옮기는 양(음수 = 왼쪽). −4 → −8 → −9
+    let countdownX: CGFloat = -7          // 남은 시간만 좌우로 옮기는 양(음수 = 왼쪽). −4 → −8 → −9 → −7
     let countdownLift: CGFloat = 0        // 더 끌어올리는 양. 0이면 숫자 위 끝 = 날짜 글자 위 끝
     // 모션(초)
     @Published var growDuration: CGFloat = 0.6
@@ -451,7 +451,7 @@ struct DropPanelView: View {
 
     /// 시계 너비. HH:MM:SS(콜론 둘)는 날짜와 상관없이 고정: 글 줄 너비에서 68을 뺀 너비.
     /// 68 = "Sat, Oct 31" 너비(57) + 간격 12 + countdownX(−9, 왼쪽으로 밀려 그려지는 만큼) + 8.
-    /// 2026-10-31에 날짜 글 12 앞까지 채우던 271에서 8 줄인 263(노치 409 기준).
+    /// 2026-10-31에 날짜 글 12 앞까지 채우던 271에서 8 줄인 263(노치 409 기준). 그 뒤 countdownX를 −7로 옮겨 오른쪽 간격은 2 줄었다.
     /// 칸 끝 기준 오른쪽 글과의 간격은 가장 넓은 날짜(Wed, May 30) 9.5 ~ 가장 좁은 날짜(Fri, Jul 7) 33.
     /// 그 밖(MM:SS 등)은 countdownWidth.
     private func clockWidth(for text: String) -> CGFloat {
