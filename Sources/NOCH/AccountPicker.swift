@@ -78,7 +78,7 @@ struct AccountPicker: View {
                 }
             }
         }
-        // 상자 안 글자(계정 이름·위 제목·Choose later)가 노치 글 줄(= 왼쪽 위 원 버튼의 왼쪽 끝)에서 시작하도록
+        // 상자 안 글자(계정 이름·위 제목·Close)가 노치 글 줄(= 왼쪽 위 원 버튼의 왼쪽 끝)에서 시작하도록
         // 상자를 안 여백(innerH)만큼 바깥으로 낸다.
         .padding(.horizontal, -Self.innerH)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
@@ -91,11 +91,11 @@ struct AccountPicker: View {
             .padding(.leading, Self.innerH)  // 계정 상자 안 글자와 왼쪽을 맞춘다
     }
 
-    /// 목록 맨 끝: 평소엔 상자 없이 "Choose later" 글자만(검정, 계정 이름과 같은 크기, 세미볼드).
+    /// 목록 맨 끝: 평소엔 상자 없이 "Close" 글자만(검정, 계정 이름과 같은 크기, 세미볼드).
     /// 마우스를 올리면 계정 상자 평소와 같은 연한 검정(0.1) 상자가 보인다. 글자는 검정 그대로. 누르면 고르지 않고 닫는다.
     private var laterRow: some View {
         Button(action: onLater) {
-            Text("Choose later")
+            Text("Close")
                 .font(.system(size: textSize + 6, weight: .semibold))
                 .foregroundStyle(.black)
                 .padding(.horizontal, Self.innerH)
