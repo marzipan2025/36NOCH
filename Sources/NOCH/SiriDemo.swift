@@ -11,7 +11,7 @@ import SwiftUI
 
 import Combine
 
-/// 모든 조절 값. 기본값은 2026-10-31 사용자가 맞춘 9차 설정.
+/// 모든 조절 값. 기본값은 2026-10-31 사용자가 맞춘 10차 설정.
 /// 바꾼 값은 UserDefaults에 저장해서 앱을 다시 켜도 이어진다.
 final class DropTuning: ObservableObject {
     // 노치 확장
@@ -20,9 +20,9 @@ final class DropTuning: ObservableObject {
     @Published var restWide = true                  // 닫혀 있을 때도 노치 검정을 좌우로 늘여 둔다
     @Published var restWidth: CGFloat = 44           // 그때 늘이는 너비(양쪽 합, 한쪽 22)
     @Published var grownBottomRadius: CGFloat = 16   // 커진 노치 아래 모서리(볼록). 원래 노치 10
-    @Published var grownTopRadius: CGFloat = 12      // 커진 노치 위 모서리(오목). 원래 노치 6
+    @Published var grownTopRadius: CGFloat = 21.5      // 커진 노치 위 모서리(오목). 원래 노치 6
     // 팝업 방울
-    @Published var popupHeight: CGFloat = 240
+    @Published var popupHeight: CGFloat = 232
     @Published var popupRadius: CGFloat = 26
     @Published var gap: CGFloat = 14                 // 커진 노치 아래 끝과 팝업 위 끝 사이
     @Published var spacing: CGFloat = 12             // GlassEffectContainer가 두 유리를 붙이는 거리
@@ -33,17 +33,17 @@ final class DropTuning: ObservableObject {
     @Published var inkNeck = true                    // 노치와 방울 사이 목도 유리 틴트로 검게
     // 유리
     @Published var clearGlass = true
-    @Published var tintOpacity: CGFloat = 0
+    @Published var tintOpacity: CGFloat = 0.05
     // 검정 덮개: 팝업 모양을 위로 끌어올려 흐리게 만든 검정. 흐린 경계가 모서리 곡선을 따라 휜다.
-    @Published var lift: CGFloat = 96              // 검정 아래 끝을 팝업 아래 끝보다 얼마나 위로
-    @Published var softness: CGFloat = 28.5          // 흐림 = 검정이 사라지는 구간 길이
-    @Published var blackRadius: CGFloat = 60         // 검정 모양의 아래 모서리 반지름(휘어짐 정도)
-    @Published var sideInset: CGFloat = -5.5          // 양옆에서 들임. 키우면 옆 가장자리에 유리가 더 드러남
+    @Published var lift: CGFloat = 65.5              // 검정 아래 끝을 팝업 아래 끝보다 얼마나 위로
+    @Published var softness: CGFloat = 37          // 흐림 = 검정이 사라지는 구간 길이
+    @Published var blackRadius: CGFloat = 44         // 검정 모양의 아래 모서리 반지름(휘어짐 정도)
+    @Published var sideInset: CGFloat = -1          // 양옆에서 들임. 키우면 옆 가장자리에 유리가 더 드러남
     @Published var blackOpacity: CGFloat = 1
     @Published var overBlack: CGFloat = 0.65          // 같은 검정 모양을 유리 "위"에도 이만큼 덧칠. 유리가 검정을 밝혀 보이게 하는 만큼 다시 어둡게
     // 하단 영역: 팝업 아래쪽 안에 둔 흰 반투명 면. 이 안에는 검정이 들어오지 않는다.
-    @Published var trayHeight: CGFloat = 58.5
-    @Published var trayMargin: CGFloat = 24          // 좌우·아래 여백
+    @Published var trayHeight: CGFloat = 48
+    @Published var trayMargin: CGFloat = 31.5          // 좌우·아래 여백
     @Published var trayOpacity: CGFloat = 0.1        // 흰색 불투명도
     @Published var trayConcentric = true             // 켜면 모서리 = 팝업 모서리 − 여백(같은 중심의 곡선), 끄면 팝업과 같은 반지름
     @Published var trayRadiusPlus: CGFloat = 4       // 위 규칙으로 정한 모서리에 더하는 값
@@ -64,7 +64,8 @@ final class DropTuning: ObservableObject {
     let textPadding: CGFloat = 22
     let textTop: CGFloat = 30                // 팝업 위 끝 ~ 시계·글 위 끝(2026-10-31 18 → 38(팝업 높이도 20 늘림) → 30)
     let popupSideExtra: CGFloat = 33         // 커진 노치를 좌우로 더 넓힌 양(한쪽). 12 → 27(전체 30) → 57(전체 60 더) → 41(전체 32 줄임) → 37 → 33(8씩 두 번 더 줄임)
-    let uiSideInset: CGFloat = 6             // 노치를 넓히고 줄일 때 글·아이콘 자리는 그대로 두려고 더한 안쪽 여백(한쪽). 하단 캡슐은 노치와 같이 바뀐다
+    /// 글·아이콘 좌우 끝을 하단 캡슐 좌우 끝(노치 끝에서 trayMargin)에 맞추려고 textPadding에 더하는 안쪽 여백(한쪽)
+    var uiSideInset: CGFloat { trayMargin - textPadding }
     let clockGap: CGFloat = 10               // 실제 노치 아래 끝 ~ 시계 숫자 위 끝(4에서 6 내림)
     // 팝업이 커진 노치보다 넓은 양(양쪽 합). 커진 노치를 줄일 때(너비 + 100 → 92 → 80) 팝업 너비는 그대로 두려고
     // 줄인 만큼(8, 12) 24에 더함
@@ -91,7 +92,7 @@ final class DropTuning: ObservableObject {
     /// 바뀔 때마다 패널이 열기/닫기 모션을 한다. 마우스 위치(SiriDemo)나 설정창 버튼이 바꾼다.
     @Published var isOpen = false
 
-    /// 9차 설정(= 기본값): 2026-10-31 집 맥. 8차(7차에 팝업 높이 240, 커진 노치 너비 + 80, 노치와 간격 14)에서
+    /// 9차 설정: 2026-10-31 집 맥. 8차(7차에 팝업 높이 240, 커진 노치 너비 + 80, 노치와 간격 14)에서
     /// 커진 노치 아래 모서리 26→16. 조절하다가 이 값으로 되돌릴 때 쓴다.
     func applyNinthPreset() {
         growWidth = 80; growHeight = 12; restWide = true; restWidth = 44; grownBottomRadius = 16; grownTopRadius = 12; popupHeight = 240
@@ -103,6 +104,15 @@ final class DropTuning: ObservableObject {
         rimOpacity = 0.05; rimWidth = 1; rimSoftness = 1; shadowOpacity = 0.3; shadowRadius = 28
         shadowY = 14.5; growDuration = 0.6
         growBounce = 0.2; dropDelay = -0.7; dropDuration = 0.55; dropBounce = 0.2; closeSpeed = 0.5
+    }
+
+    /// 10차 설정(= 기본값): 2026-10-31 집 맥. 9차에서 위 모서리 21.5, 팝업 높이 232, 검정 덮개(lift 65.5, 흐림 37, 모서리 44, 들임 −1),
+    /// 틴트 0.05, 하단 캡슐 높이 48·여백 31.5.
+    func applyTenthPreset() {
+        applyNinthPreset()
+        grownTopRadius = 21.5; popupHeight = 232; tintOpacity = 0.05
+        lift = 65.5; softness = 37; blackRadius = 44; sideInset = -1
+        trayHeight = 48; trayMargin = 31.5
     }
 
     // MARK: 저장
@@ -398,7 +408,7 @@ struct DropPanelView: View {
                 } }
                     .font(.system(size: tuning.textSize, weight: .light))
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, tuning.textPadding + tuning.uiSideInset)  // 노치 좌우 끝에서 22 + 6
+                    .padding(.horizontal, tuning.textPadding + tuning.uiSideInset)  // 노치 좌우 끝에서 trayMargin(= 하단 캡슐 좌우 끝)
                     .padding(.top, tuning.contentTop(metrics: metrics))
                     .opacity(dropped ? 1 : 0)
             }
@@ -612,6 +622,7 @@ struct DropControlView: View {
                 Button("다시 재생") { replay() }
                 Spacer()
                 Button("9차설정") { tuning.applyNinthPreset(); replay() }
+                Button("10차설정") { tuning.applyTenthPreset(); replay() }
                 Button("종료") { NSApp.terminate(nil) }
             }
             .padding(16)
