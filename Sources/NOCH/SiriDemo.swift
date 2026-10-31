@@ -64,14 +64,14 @@ final class DropTuning: ObservableObject {
     let textPadding: CGFloat = 22
     let textTop: CGFloat = 30                // 팝업 위 끝 ~ 시계·글 위 끝(2026-10-31 18 → 38(팝업 높이도 20 늘림) → 30)
     let popupSideExtra: CGFloat = 27         // 시계·글·하단 영역은 그대로 두고 노치만 좌우로 더 넓힌 양(한쪽). 그만큼 안쪽 여백이 는다(12 → 27: 전체 30 넓힘)
-    let clockGap: CGFloat = 4                // 실제 노치 아래 끝 ~ 시계 숫자 위 끝
+    let clockGap: CGFloat = 10               // 실제 노치 아래 끝 ~ 시계 숫자 위 끝(4에서 6 내림)
     // 팝업이 커진 노치보다 넓은 양(양쪽 합). 커진 노치를 줄일 때(너비 + 100 → 92 → 80) 팝업 너비는 그대로 두려고
     // 줄인 만큼(8, 12) 24에 더함
     var popupExtraWidth: CGFloat { 44 + popupSideExtra * 2 }
     // 다음 회의까지 남은 시간(Distro Mix, 금색). 너비를 고정하고, 글자 수가 줄면 그만큼 글자가 커져 아래로 늘어난다.
     let countdownWidth: CGFloat = 204     // 시계 너비. 204면 8자리(70:02:31)가 약 49pt
     let countdownGap: CGFloat = 12        // 숫자 아래 끝 ~ 제목 글자 위 끝
-    let countdownX: CGFloat = -4          // 남은 시간만 좌우로 옮기는 양(음수 = 왼쪽)
+    let countdownX: CGFloat = -8          // 남은 시간만 좌우로 옮기는 양(음수 = 왼쪽). −4에서 4 더 왼쪽
     let countdownLift: CGFloat = 0        // 더 끌어올리는 양. 0이면 숫자 위 끝 = 날짜 글자 위 끝
     // 모션(초)
     @Published var growDuration: CGFloat = 0.6
