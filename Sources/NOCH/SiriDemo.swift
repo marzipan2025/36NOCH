@@ -158,8 +158,8 @@ final class DropTuning: ObservableObject {
     var openTimeline: (grow: Spring, drop: Spring, dropStart: Double, inkStart: Double, total: Double) {
         let grow = Spring(duration: Double(growDuration), bounce: Double(growBounce))
         let drop = Spring(duration: Double(dropDuration), bounce: Double(dropBounce))
-        let dropStart = max(0, Double(growDuration + dropDelay))
-        let inkStart = dropStart + Double(inkDelay)
+        let dropStart = 0.0  // 팝업이 노치와 하나가 되어 떨어짐은 없다
+        let inkStart = Double(inkDelay)
         // 팝업이 노치와 하나가 되어(2026-10-31) 따로 떨어지지 않는다. drop 값은 남겨 두지만 전체 길이에 넣지 않는다.
         let total = max(grow.visibleDuration, inkStart + Double(inkDuration))
         return (grow, drop, dropStart, inkStart, total)
@@ -192,7 +192,6 @@ struct DropPanelView: View {
     private var notchWidth: CGFloat {
         metrics.width + (grown ? tuning.growWidth : tuning.restWide ? tuning.restWidth : 0)
     }
-    private var notchHeight: CGFloat { metrics.height + (grown ? tuning.growHeight : 0) }
 
 
     /// 노치 모양을 그리는 틀 너비. 위 두 모서리는 화면 위 끝에서 바깥으로 오목하게 퍼지므로(위 반지름만큼)
@@ -267,10 +266,10 @@ struct DropPanelView: View {
     private var notchButtons: some View {
         let d: CGFloat = 14
         // 닫혀 있으면 실제 노치 좌우 끝 바로 바깥, 열리면 아이콘 바깥 끝을 글 좌우 끝(노치 끝에서 textPadding)에 맞춘다.
-        // 높이는 노치 가운데에서 열리면 위로 4.
+        // 높이는 실제 노치 가운데, 열리면 2 아래.
         let x = grown ? popupSize.width / 2 - tuning.textPadding - d / 2
                       : metrics.width / 2 + d / 2
-        let y = notchHeight / 2 - d / 2 - (grown ? 4 : 0)
+        let y = metrics.height / 2 - d / 2 + (grown ? 2 : 0)
         let color = grown ? Color(red: 0x24 / 255, green: 0x25 / 255, blue: 0x2F / 255)
                           : Color(red: 0x18 / 255, green: 0x18 / 255, blue: 0x18 / 255)
         // 열려 있을 때 마우스를 올리면 #303243
@@ -617,75 +616,52 @@ struct DropControlView: View {
             .padding(16)
             Divider()
             column {
-                    section("노치 확장")
-                    sliderRow("너비 +", $tuning.growWidth, 0...300, step: 2)
-                    sliderRow("높이 +", $tuning.growHeight, 0...60)
-                    Toggle("닫혀 있을 때도 너비를 늘여 둠", isOn: $tuning.restWide)
-                    sliderRow("닫혔을 때 너비 +", $tuning.restWidth, 0...200)
-                    sliderRow("아래 모서리(볼록)", $tuning.grownBottomRadius, 0...60)
-                    sliderRow("위 모서리(오목)", $tuning.grownTopRadius, 0...30)
-                    radiusNote
+                section("노치 크기")
+                sliderRow("열린 너비 +", $tuning.growWidth, 0...300, step: 2)
+                sliderRow("열린 높이(글 아래)", $tuning.popupHeight, 120...400, step: 2)
+                sliderRow("위 모서리(오목)", $tuning.grownTopRadius, 0...30)
+                Toggle("닫혀 있을 때도 너비를 늘여 둠", isOn: $tuning.restWide)
+                sliderRow("닫혔을 때 너비 +", $tuning.restWidth, 0...200)
 
-                    section("팝업 방울")
-                    sliderRow("높이", $tuning.popupHeight, 40...400, step: 2)
-                    sliderRow("모서리 반지름", $tuning.popupRadius, 0...80)
-                    sliderRow("노치와 간격", $tuning.gap, 0...60)
-                    sliderRow("붙는 거리(spacing)", $tuning.spacing, 0...80)
-                    sliderRow("대기 높이(실제 노치 밑)", $tuning.grainHeight, 4...36)
-                    sliderRow("대기 너비 줄임(실제 노치 대비)", $tuning.waitInset, 0...40)
+                section("유리와 검정")
+                Toggle("clear 유리 (끄면 regular)", isOn: $tuning.clearGlass)
+                sliderRow("유리 검정 틴트", $tuning.tintOpacity, 0...1, step: 0.05)
+                sliderRow("검정 끌어올림", $tuning.lift, -40...300)
+                sliderRow("흐림(전이 길이)", $tuning.softness, 0...80)
+                sliderRow("검정 모서리 반지름", $tuning.blackRadius, 0...80)
+                sliderRow("양옆 들임", $tuning.sideInset, -30...60)
+                sliderRow("검정 불투명도", $tuning.blackOpacity, 0...1, step: 0.05)
+                sliderRow("유리 위 덧칠", $tuning.overBlack, 0...1, step: 0.05)
 
-                    section("유리")
-                    Toggle("clear 유리 (끄면 regular)", isOn: $tuning.clearGlass)
-                    sliderRow("검정 틴트", $tuning.tintOpacity, 0...1, step: 0.05)
+                section("하단 캡슐")
+                sliderRow("높이", $tuning.trayHeight, 0...200)
+                sliderRow("좌우·아래 여백", $tuning.trayMargin, 0...40)
+                sliderRow("흰색 불투명도", $tuning.trayOpacity, 0...1, step: 0.05)
+                sliderRow("나타나는 때(열림 끝 기준)", $tuning.trayDelay, -1...3, step: 0.05)
+                sliderRow("나타나는 시간", $tuning.trayFade, 0.05...2, step: 0.05)
 
-                    section("마우스")
-                    sliderRow("여는 거리(노치 좌우)", $tuning.hoverMargin, 0...200)
-                    sliderRow("여는 거리(노치 아래)", $tuning.hoverDown, 0...200)
-                    sliderRow("닫는 거리(노치+팝업 둘레)", $tuning.keepMargin, 0...80)
-                    Toggle("설정창이 떠 있으면 펼친 채 유지", isOn: $tuning.holdWhileSettings)
+                section("테두리와 그림자")
+                sliderRow("테두리 빛 밝기", $tuning.rimOpacity, 0...1, step: 0.05)
+                sliderRow("테두리 빛 굵기", $tuning.rimWidth, 0...6)
+                sliderRow("테두리 빛 번짐", $tuning.rimSoftness, 0...6)
+                sliderRow("그림자 진하기", $tuning.shadowOpacity, 0...1, step: 0.05)
+                sliderRow("그림자 번짐", $tuning.shadowRadius, 0...60)
+                sliderRow("그림자 아래로", $tuning.shadowY, -10...40)
 
-                    section("모션 (초)")
-                    Text("열 때").font(.subheadline)
-                    sliderRow("노치 커지는 시간", $tuning.growDuration, 0.05...2, step: 0.05)
-                    sliderRow("노치 튕김", $tuning.growBounce, 0...0.8, step: 0.05)
-                    sliderRow("팝업 시작(노치 끝 기준)", $tuning.dropDelay, -2...1.5, step: 0.05)
-                    sliderRow("팝업 떨어지는 시간", $tuning.dropDuration, 0.1...3, step: 0.05)
-                    sliderRow("떨어짐 튕김", $tuning.dropBounce, 0...0.8, step: 0.05)
-                    sliderRow("검정 빠지기 시작(떨어짐 후)", $tuning.inkDelay, 0...3, step: 0.05)
-                    sliderRow("검정 → 유리 시간", $tuning.inkDuration, 0.05...3, step: 0.05)
-                    Toggle("노치와 방울 사이 목도 검정 (유리 틴트)", isOn: $tuning.inkNeck)
-                    timeline
-                    Text("닫을 때").font(.subheadline)
-                    sliderRow("닫힘 속도 배율 (1 = 열 때 그대로 역재생)", $tuning.closeSpeed, 0.2...1.5, step: 0.05)
+                section("모션 (초)")
+                sliderRow("커지는 시간", $tuning.growDuration, 0.05...2, step: 0.05)
+                sliderRow("튕김", $tuning.growBounce, 0...0.8, step: 0.05)
+                sliderRow("검정 걷히기 시작", $tuning.inkDelay, 0...3, step: 0.05)
+                sliderRow("검정 → 유리 시간", $tuning.inkDuration, 0.05...3, step: 0.05)
+                Toggle("커지는 동안 유리도 검게 (틴트)", isOn: $tuning.inkNeck)
+                sliderRow("닫힘 속도 배율 (1 = 열 때 그대로 역재생)", $tuning.closeSpeed, 0.2...1.5, step: 0.05)
+                timeline
 
-                    section("검정 덮개 (유리 아래)")
-                    sliderRow("끌어올림", $tuning.lift, -40...300)
-                    sliderRow("흐림(전이 길이)", $tuning.softness, 0...80)
-                    sliderRow("검정 모서리 반지름", $tuning.blackRadius, 0...80)
-                    sliderRow("양옆 들임", $tuning.sideInset, -30...60)
-                    sliderRow("불투명도", $tuning.blackOpacity, 0...1, step: 0.05)
-                    sliderRow("유리 위 덧칠", $tuning.overBlack, 0...1, step: 0.05)
-
-                    section("하단 영역 (검정 안 들어옴)")
-                    sliderRow("높이", $tuning.trayHeight, 0...200)
-                    sliderRow("좌우·아래 여백", $tuning.trayMargin, 0...40)
-                    sliderRow("흰색 불투명도", $tuning.trayOpacity, 0...1, step: 0.05)
-                    Toggle("모서리 = 팝업 모서리 − 여백 (끄면 팝업과 같은 반지름)", isOn: $tuning.trayConcentric)
-                    Toggle("좌우 완전한 반원", isOn: $tuning.trayCapsule)
-                    Toggle("팝업 아래 모서리를 하단 영역과 같은 중심으로", isOn: $tuning.popupBottomConcentric)
-                    sliderRow("모서리 더하기", $tuning.trayRadiusPlus, -20...30)
-                    sliderRow("등장 끝 기준 나타나는 때", $tuning.trayDelay, -1...3, step: 0.05)
-                    sliderRow("나타나는 시간", $tuning.trayFade, 0.05...2, step: 0.05)
-
-                    section("바깥 그림자")
-                    sliderRow("진하기", $tuning.shadowOpacity, 0...1, step: 0.05)
-                    sliderRow("번짐", $tuning.shadowRadius, 0...60)
-                    sliderRow("아래로", $tuning.shadowY, -10...40)
-
-                    section("덧그린 테두리 빛")
-                    sliderRow("밝기", $tuning.rimOpacity, 0...1, step: 0.05)
-                    sliderRow("굵기", $tuning.rimWidth, 0...6)
-                    sliderRow("번짐", $tuning.rimSoftness, 0...6)
+                section("마우스")
+                sliderRow("여는 거리(노치 좌우)", $tuning.hoverMargin, 0...200)
+                sliderRow("여는 거리(노치 아래)", $tuning.hoverDown, 0...200)
+                sliderRow("닫는 거리(노치 둘레)", $tuning.keepMargin, 0...80)
+                Toggle("설정창이 떠 있으면 펼친 채 유지", isOn: $tuning.holdWhileSettings)
             }
         }
         // 검정 바탕에 맞춰 컨트롤·글자를 어두운 모양(흰 글자)으로
@@ -710,44 +686,29 @@ struct DropControlView: View {
         Text(title).font(.system(size: 26, weight: .semibold)).padding(.top, 9.6)
     }
 
-    /// 열 때 시간표: 노치 0초 시작 → 팝업 시작 → 팝업 끝. 막대로 겹침을 보여 준다.
+    /// 열 때 시간표: 노치가 커지는 동안(흰색)과 검정이 걷혀 유리가 드러나는 동안(회색)
     private var timeline: some View {
-        let grow = Double(tuning.growDuration)
-        let dropStart = max(0, grow + Double(tuning.dropDelay))
-        let dropEnd = dropStart + Double(tuning.dropDuration)
-        let inkStart = dropStart + Double(tuning.inkDelay)
+        let line = tuning.openTimeline
+        let grow = line.grow.visibleDuration
+        let inkStart = line.inkStart
         let inkEnd = inkStart + Double(tuning.inkDuration)
-        let total = max(grow, dropEnd, inkEnd)
+        let total = max(line.total, 0.01)
         return VStack(alignment: .leading, spacing: 4) {
             GeometryReader { geo in
                 let scale = geo.size.width / total
                 VStack(alignment: .leading, spacing: 3) {
                     Capsule().fill(.white)
                         .frame(width: max(2, grow * scale), height: 6)
-                    Capsule().fill(.blue)
-                        .frame(width: max(2, Double(tuning.dropDuration) * scale), height: 6)
-                        .offset(x: dropStart * scale)
                     Capsule().fill(.gray)
                         .frame(width: max(2, Double(tuning.inkDuration) * scale), height: 6)
                         .offset(x: inkStart * scale)
                 }
             }
-            .frame(height: 24)
-            Text(String(format: "노치(흰색) 0 → %.2f초 · 팝업(파랑) %.2f → %.2f초 · 검정→유리(회색) %.2f → %.2f초 · 전체 %.2f초",
-                        grow, dropStart, dropEnd, inkStart, inkEnd, total))
+            .frame(height: 16)
+            Text(String(format: "노치(흰색) 0 → %.2f초 · 검정→유리(회색) %.2f → %.2f초 · 전체 %.2f초",
+                        grow, inkStart, inkEnd, total))
                 .font(.caption).foregroundStyle(.secondary)
         }
-    }
-
-    /// 커진 노치에서 아래 모서리가 가질 수 있는 최대값 안내
-    private var radiusNote: some View {
-        let h = metrics.height + tuning.growHeight
-        let w = metrics.width + tuning.growWidth
-        let geometric = NotchShape.maxBottomRadius(width: w, height: h, topRadius: tuning.grownTopRadius)
-        let hardware = NotchMetrics.bottomRadius / metrics.height * h
-        return Text(String(format: "커진 노치 %.0f×%.0f — 하드웨어 비율 %.1f · 권장 상한(높이 절반) %.1f · 기하 최대 %.1f",
-                           w, h, hardware, h / 2, geometric))
-            .font(.caption).foregroundStyle(.secondary)
     }
 
     private func replay() {
@@ -999,7 +960,7 @@ extension DropTuning {
     @MainActor
     func popupHeight(calendar: CalendarFeed, metrics: NotchMetrics) -> CGFloat {
         guard calendar.picking, calendar.status != .denied, !calendar.accounts.isEmpty else { return popupHeight }
-        let top = metrics.height + growHeight + gap  // 화면 위 끝 ~ 팝업 위 끝
+        let top = contentTop(metrics: metrics) - textTop  // 화면 위 끝 ~ 예전 팝업 위 끝에 해당하는 곳
         let n = CGFloat(calendar.accounts.count)
         let list = 16 + AccountPicker.titleGap + n * AccountPicker.rowHeight + n * AccountPicker.rowGap
             + AccountPicker.laterHeight  // 맨 끝 "Later"
