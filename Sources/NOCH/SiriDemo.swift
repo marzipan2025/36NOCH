@@ -159,7 +159,8 @@ final class DropTuning: ObservableObject {
         let drop = Spring(duration: Double(dropDuration), bounce: Double(dropBounce))
         let dropStart = max(0, Double(growDuration + dropDelay))
         let inkStart = dropStart + Double(inkDelay)
-        let total = max(grow.visibleDuration, dropStart + drop.visibleDuration, inkStart + Double(inkDuration))
+        // 팝업이 노치와 하나가 되어(2026-10-31) 따로 떨어지지 않는다. drop 값은 남겨 두지만 전체 길이에 넣지 않는다.
+        let total = max(grow.visibleDuration, inkStart + Double(inkDuration))
         return (grow, drop, dropStart, inkStart, total)
     }
 
@@ -178,10 +179,11 @@ struct DropPanelView: View {
     @ObservedObject var calendar: CalendarFeed
     @ObservedObject var updates: UpdateFeed
 
-    // 모션 단계: 노치가 커졌는지, 방울이 떨어졌는지
+    // 모션 단계. 팝업은 따로 없고(2026-10-31) 노치가 팝업 크기까지 커지며, 아래쪽이 예전 팝업 모양(유리)이 된다.
+    // dropped는 늘 grown과 같이 바뀐다(글·그림자를 보일지).
     @State private var grown = false
     @State private var dropped = false
-    @State private var inked = true       // 팝업이 온통 검정인지. 노치 밑에서 기다릴 때와 떨어지기 시작할 때는 검정 방울
+    @State private var inked = true       // 커진 노치가 온통 검정인지. 열릴 때 검정으로 커졌다가 아래쪽이 유리로 걷힌다
     @State private var trayShown = false  // 하단 영역. 팝업 등장이 끝난 뒤에 나타난다
     @State private var sequence: Task<Void, Never>?
 
@@ -191,40 +193,38 @@ struct DropPanelView: View {
     }
     private var notchHeight: CGFloat { metrics.height + (grown ? tuning.growHeight : 0) }
 
-    // 노치가 커질 때 모서리도 함께 커진다(NotchShape가 반지름까지 애니메이션).
-    private var notchShape: NotchShape {
-        NotchShape(width: notchWidth, height: notchHeight,
-                   // 닫힌 노치(좌우로 늘여 둔 검정)의 아래 모서리는 실제 노치(10)보다 4 크게(14) — 같으면 더 작아 보였다
-                   bottomRadius: grown ? tuning.grownBottomRadius : NotchMetrics.bottomRadius + 4,
-                   topRadius: grown ? tuning.grownTopRadius : NotchMetrics.topRadius)
-    }
 
-    // 떨어지기 전에는 실제(하드웨어) 노치보다 조금 좁고 낮게 숨어 있다가,
-    // 떨어지면서 커진 노치 너비까지 넓어지며 드러난다. 하드웨어 노치는 불투명해서 그 밑은 화면에 안 보인다.
+    /// 커진 노치에서 예전 팝업이 시작하던 높이(화면 위 끝에서). 글·하단 영역은 이 아래에 예전 팝업과 같은 자리로 놓인다.
+    private var bodyTop: CGFloat { metrics.height + tuning.growHeight + tuning.gap }
+
+    /// 노치 전체(닫힘 = 실제 노치 + 좌우로 늘여 둔 만큼, 열림 = 예전 팝업 너비 × 화면 위 끝~예전 팝업 아래 끝).
+    /// 이름은 예전 그대로 popupSize·popupShape를 쓴다. popupTop은 늘 0(화면 위 끝).
     private var popupSize: CGSize {
-        dropped ? CGSize(width: metrics.width + tuning.growWidth + tuning.popupExtraWidth,
-                         height: tuning.popupHeight(calendar: calendar, metrics: metrics))
-                : CGSize(width: max(1, metrics.width - tuning.waitInset), height: tuning.grainHeight)
+        grown ? CGSize(width: metrics.width + tuning.growWidth + tuning.popupExtraWidth,
+                       height: bodyTop + tuning.popupHeight(calendar: calendar, metrics: metrics))
+              : CGSize(width: notchWidth, height: metrics.height)
     }
-    private var popupTop: CGFloat {
-        dropped ? notchHeight + tuning.gap : max(0, metrics.height - tuning.waitInset / 2 - tuning.grainHeight)
-    }
+    private var popupTop: CGFloat { 0 }
 
     private var glass: Glass {
         let base: Glass = tuning.clearGlass ? .clear : .regular
-        // 검정 방울일 때는 유리 자체도 검게 물들여서, 노치와 방울 사이 목까지 검정으로 이어지게 한다.
+        // 온통 검정일 때는 유리 자체도 검게 물들인다
         if inked && tuning.inkNeck { return base.tint(.black) }
         return tuning.tintOpacity > 0 ? base.tint(.black.opacity(tuning.tintOpacity)) : base
     }
 
-    /// 아래 두 모서리는 켜 두면 하단 영역 곡선과 같은 중심(하단 영역 반지름 + 여백), 끄면 팝업 반지름.
-    /// 위 두 모서리도 아래와 같은 값으로 둥글린다(2026-10-31). 팝업 반지름 값은 아래 같은 중심을 끈 때와 하단 영역 계산에만 쓴다.
-    private var popupShape: UnevenRoundedRectangle {
-        let limit = min(popupSize.height / 2, popupSize.width / 2)
+    /// 노치 전체 모양. 위 두 모서리는 화면 위 끝과 이어지는 오목한 곡선(노치), 아래 두 모서리는
+    /// 켜 두면 하단 영역 곡선과 같은 중심(하단 영역 반지름 + 여백), 끄면 팝업 반지름. 닫히면 실제 노치 모양.
+    private var popupShape: NotchShape {
+        let size = popupSize
+        if !grown {
+            // 닫힌 노치(좌우로 늘여 둔 검정)의 아래 모서리는 실제 노치(10)보다 4 크게(14) — 같으면 더 작아 보였다
+            return NotchShape(width: size.width, height: size.height,
+                              bottomRadius: NotchMetrics.bottomRadius + 4, topRadius: NotchMetrics.topRadius)
+        }
+        let limit = min(size.height / 2, size.width / 2)
         let bottom = tuning.popupBottomConcentric ? min(trayRadius + tuning.trayMargin, limit) : min(tuning.popupRadius, limit)
-        let top = bottom
-        return UnevenRoundedRectangle(topLeadingRadius: top, bottomLeadingRadius: bottom,
-                                      bottomTrailingRadius: bottom, topTrailingRadius: top)
+        return NotchShape(width: size.width, height: size.height, bottomRadius: bottom, topRadius: tuning.grownTopRadius)
     }
 
     /// 하단 영역 모서리 반지름. 팝업의 위 모서리 기준으로 정해서, 팝업 아래 모서리와 서로 물고 돌지 않게 한다.
@@ -243,8 +243,16 @@ struct DropPanelView: View {
             // 가장자리에서는 유리의 렌즈 효과로 검정이 모서리를 따라 휜다. (위에 덮으면 매트한 평면이 된다)
             popupLayers
 
-            // 커진 노치는 하드웨어 노치와 같은 검정
-            notchShape.fill(.black)
+            // 위쪽 띠(하드웨어 노치 + 커진 높이 + 간격)는 하드웨어 노치와 같은 검정. 그 아래 60에 걸쳐 옅어져
+            // 검정 덮개(흐린 경계)로 이어진다. 닫히면 모양 전체가 이 띠 안이라 온통 검정.
+            popupShape.fill(.black)
+                .frame(width: popupSize.width, height: popupSize.height)
+                .mask {
+                    LinearGradient(stops: [.init(color: .black, location: 0),
+                                           .init(color: .black, location: bodyTop / max(popupSize.height, 1)),
+                                           .init(color: .clear, location: min(1, (bodyTop + 60) / max(popupSize.height, 1)))],
+                                   startPoint: .top, endPoint: .bottom)
+                }
 
             notchButtons
         }
@@ -316,25 +324,16 @@ struct DropPanelView: View {
         ZStack(alignment: .top) {
             popupBlack(opacity: tuning.blackOpacity)
 
-            GlassEffectContainer(spacing: tuning.spacing) {
-                ZStack(alignment: .top) {
-                    // 노치 쪽 유리: 검정 아래에 깔려서, 방울과 이어지는 목만 유리로 보인다.
-                    Color.clear
-                        .glassEffect(glass, in: notchShape)
-
-                    Color.clear
-                        .frame(width: popupSize.width, height: popupSize.height)
-                        .glassEffect(glass, in: popupShape)
-                        .offset(y: popupTop)
-                }
-                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-            }
+            // 유리는 노치 전체 모양 하나. 위쪽은 검정에 덮이고 아래쪽만 유리로 보인다.
+            Color.clear
+                .frame(width: popupSize.width, height: popupSize.height)
+                .glassEffect(glass, in: popupShape)
 
             // 덧칠: 유리 아래 검정만으로는 유리가 빛을 더해 덜 검게 보인다. 같은 모양을 유리 위에 반투명으로 한 번 더.
             // 위에 덮는 만큼 유리 질감도 가려지므로 불투명도로 맞춘다(1이면 처음의 매트한 평면과 같아짐).
             popupBlack(opacity: tuning.overBlack)
 
-            // 검정 방울: 노치와 같은 검정으로 덮었다가 떨어지면서 걷혀 유리가 드러난다.
+            // 온통 검정: 노치와 같은 검정으로 커졌다가 걷혀 아래쪽 유리가 드러난다.
             popupShape.fill(.black)
                 .frame(width: popupSize.width, height: popupSize.height)
                 .offset(y: popupTop)
@@ -354,7 +353,7 @@ struct DropPanelView: View {
                     AccountPicker(calendar: calendar, textSize: tuning.textSize,
                                   onLater: { calendar.later(); tuning.isOpen = false })
                         // 계정마다 검정 상자에 담기므로 아래 투명한 유리까지 내려가도 된다. 아래 여백은 18.
-                        .frame(height: max(0, popupSize.height - tuning.textTop - 18))
+                        .frame(height: max(0, popupSize.height - bodyTop - tuning.textTop - 18))
                 } else {
                 TimelineView(.periodic(from: Date(timeIntervalSinceReferenceDate: Date().timeIntervalSinceReferenceDate.rounded(.down)), by: 0.5)) { context in
                     let now = context.date
@@ -395,7 +394,7 @@ struct DropPanelView: View {
                     .font(.system(size: tuning.textSize, weight: .light))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, tuning.textPadding + tuning.popupSideExtra)
-                    .padding(.top, tuning.textTop)
+                    .padding(.top, bodyTop + tuning.textTop)
                     .opacity(dropped ? 1 : 0)
             }
             .frame(width: popupSize.width, height: popupSize.height, alignment: .topLeading)
@@ -495,25 +494,22 @@ struct DropPanelView: View {
     /// 유리 가장자리 빛. 위는 밝게, 옆은 거의 없게, 아래는 다시 살짝 — 빛이 위에서 비치는 유리처럼.
     private var rim: some View {
         popupShape
-            .strokeBorder(
+            .stroke(
                 LinearGradient(stops: [
                     .init(color: .white.opacity(tuning.rimOpacity), location: 0),
                     .init(color: .white.opacity(tuning.rimOpacity * 0.15), location: 0.45),
                     .init(color: .white.opacity(tuning.rimOpacity * 0.6), location: 1),
                 ], startPoint: .top, endPoint: .bottom),
-                lineWidth: tuning.rimWidth)
+                lineWidth: tuning.rimWidth * 2)  // 모양 밖으로 나간 절반은 아래 clipShape로 잘린다
+            .clipShape(popupShape)
             .blur(radius: tuning.rimSoftness)
     }
 
     /// 바깥 그림자만 남긴다. 그림자를 만드는 모양 자체는 오려 내서 투명한 유리 안이 어두워지지 않게 한다.
     private var shadowLayer: some View {
-        let shapes = ZStack(alignment: .top) {
-            notchShape.fill(.black)
-            popupShape.fill(.black)
-                .frame(width: popupSize.width, height: popupSize.height)
-                .offset(y: popupTop)
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        let shapes = popupShape.fill(.black)
+            .frame(width: popupSize.width, height: popupSize.height)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
         return shapes
             .shadow(color: .black.opacity(tuning.shadowOpacity), radius: tuning.shadowRadius, y: tuning.shadowY)
@@ -536,8 +532,7 @@ struct DropPanelView: View {
         var steps: [(at: Double, run: () -> Void)]
         if open {
             steps = [
-                (0, { withAnimation(.spring(line.grow)) { grown = true } }),
-                (line.dropStart, { withAnimation(.spring(line.drop)) { dropped = true } }),
+                (0, { withAnimation(.spring(line.grow)) { grown = true; dropped = true } }),
                 (line.inkStart, { withAnimation(.easeInOut(duration: ink)) { inked = false } }),
                 (line.total + Double(t.trayDelay), {
                     withAnimation(.easeInOut(duration: Double(t.trayFade))) { trayShown = true } }),
@@ -550,10 +545,8 @@ struct DropPanelView: View {
                 (0, { withAnimation(.easeInOut(duration: Double(t.trayFade) * k)) { trayShown = false } }),
                 (k * (T - line.inkStart - ink), {
                     withAnimation(.easeInOut(duration: ink * k)) { inked = true } }),
-                (k * (T - line.dropStart - line.drop.visibleDuration), {
-                    withAnimation(Animation(ReversedSpring(spring: line.drop, scale: k))) { dropped = false } }),
                 (k * (T - line.grow.visibleDuration), {
-                    withAnimation(Animation(ReversedSpring(spring: line.grow, scale: k))) { grown = false } }),
+                    withAnimation(Animation(ReversedSpring(spring: line.grow, scale: k))) { grown = false; dropped = false } }),
             ]
         }
         steps.sort { $0.at < $1.at }
