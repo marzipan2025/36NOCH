@@ -189,9 +189,6 @@ struct DropPanelView: View {
     @State private var dropped = false
     @State private var inked = true       // 커진 노치가 온통 검정인지. 열릴 때 검정으로 커졌다가 아래쪽이 유리로 걷힌다
     @State private var trayShown = false  // 하단 영역. 팝업 등장이 끝난 뒤에 나타난다
-    /// 시험용: `--test-red` 면 늘 붉게(`--test-settings --test-open`과 같이 써서 본다)
-    private static let testRed = CommandLine.arguments.contains("--test-red")
-    @State private var finalRed = false   // 회의 10초 전부터 00:00 깜빡임이 끝나 닫힐 때까지 아래 유리를 붉게
     @State private var sequence: Task<Void, Never>?
 
     // 닫혀 있을 때도 너비를 restWidth만큼 늘여 둘 수 있다(restWide).
@@ -255,13 +252,6 @@ struct DropPanelView: View {
             notchButtons
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .onReceive(Timer.publish(every: 0.25, on: .main, in: .common).autoconnect()) { now in
-            let red = Self.testRed || calendar.next.map {
-                let left = $0.start.timeIntervalSince(now)
-                return left <= 10 && left > -CalendarFeed.blink
-            } ?? false
-            if red != finalRed { withAnimation(.easeInOut(duration: 0.3)) { finalRed = red } }
-        }
         .onChange(of: tuning.isOpen) { _, open in
             if open { calendar.reload() }
             play(open: open)
@@ -341,18 +331,6 @@ struct DropPanelView: View {
             // 덧칠: 유리 아래 검정만으로는 유리가 빛을 더해 덜 검게 보인다. 같은 모양을 유리 위에 반투명으로 한 번 더.
             // 위에 덮는 만큼 유리 질감도 가려지므로 불투명도로 맞춘다(1이면 처음의 매트한 평면과 같아짐).
             popupBlack(opacity: tuning.overBlack)
-
-            // 회의 10초 전 ~ 시작 뒤 00:00 깜빡임이 끝날 때까지: 아래 투명한 유리를 붉게(#ff3b30, 알림 시계 색) 채운다.
-            // 검정 덮개와 같은 흐린 경계 아래로만 보이게 덮개 모양을 오려 낸다. 하단 캡슐·글은 이 위에 그대로.
-            popupShape.fill(Color(red: 1, green: 0x3b / 255, blue: 0x30 / 255).opacity(0.85))
-                .frame(width: shapeFrameWidth, height: popupSize.height)
-                .mask {
-                    Rectangle()
-                        .overlay { blackCover.frame(width: popupSize.width, height: popupSize.height, alignment: .topLeading)
-                            .blendMode(.destinationOut) }
-                        .compositingGroup()
-                }
-                .opacity(finalRed && dropped ? 1 : 0)
 
             // 온통 검정: 노치와 같은 검정으로 커졌다가 걷혀 아래쪽 유리가 드러난다.
             popupShape.fill(.black)
