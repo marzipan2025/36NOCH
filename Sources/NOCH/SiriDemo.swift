@@ -387,6 +387,7 @@ struct DropPanelView: View {
                                 .foregroundStyle(hoverNow ? Color(red: Self.sky.r, green: Self.sky.g, blue: Self.sky.b)
                                                           : Color(red: 0xcc / 255, green: 0xcc / 255, blue: 0xde / 255))  // #CCCCDE
                                 .frame(width: 14, height: 14)
+                                .offset(x: 1)  // 날짜 글 오른쪽 끝보다 1 오른쪽
                                 .contentShape(Rectangle().inset(by: -6))
                                 .onHover { hoverNow = $0 }
                         }
