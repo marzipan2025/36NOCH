@@ -20,6 +20,24 @@ final class CalendarFeed: ObservableObject {
         let start: Date
         let end: Date
         let allDay: Bool
+        /// 캘린더 앱에서 이 일정을 바로 여는 주소(ical://ekevent/…). 못 만들면 nil.
+        var showURL: URL? = nil
+    }
+
+    /// 캘린더 앱이 받는 비공개 주소 ical://ekevent/<외부 ID>?method=show&options=more 로 일정을 연다.
+    /// 반복 일정은 외부 ID 앞에 이번 회차 시작(UTC, yyyyMMdd'T'HHmmss'Z')을 붙여야 그 회차가 열린다.
+    static func showURL(for event: EKEvent) -> URL? {
+        guard let ext = event.calendarItemExternalIdentifier,
+              let id = ext.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed.subtracting(["/"])) else { return nil }
+        var path = id
+        if event.hasRecurrenceRules, let start = event.startDate {
+            let f = DateFormatter()
+            f.locale = Locale(identifier: "en_US_POSIX")
+            f.timeZone = TimeZone(identifier: "UTC")
+            f.dateFormat = "yyyyMMdd'T'HHmmss'Z'"
+            path = f.string(from: start) + "/" + id
+        }
+        return URL(string: "ical://ekevent/\(path)?method=show&options=more")
     }
 
     enum Status { case unknown, denied, noAccount, ready }
@@ -107,9 +125,9 @@ final class CalendarFeed: ObservableObject {
             .filter { !$0.isAllDay && $0.startDate > now.addingTimeInterval(-Self.linger) }
             .min { $0.startDate < $1.startDate }
             .map { Item(id: $0.eventIdentifier ?? UUID().uuidString, title: $0.title ?? "(No title)",
-                        start: $0.startDate, end: $0.endDate, allDay: false) }
+                        start: $0.startDate, end: $0.endDate, allDay: false, showURL: Self.showURL(for: $0)) }
         status = .ready
-        say("캘린더: 다음 회의", next.map { "\($0.start) \($0.title)" } ?? "없음")
+        say("캘린더: 다음 회의", next.map { "\($0.start) \($0.title) \($0.showURL?.absoluteString ?? "-")" } ?? "없음")
         say("캘린더: \(calendars.map(\.title)) 에서 오늘 남은 일정 \(today.count)개")
     }
 

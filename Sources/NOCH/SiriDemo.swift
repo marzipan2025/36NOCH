@@ -358,7 +358,7 @@ struct DropPanelView: View {
                                         clockVisible: !blinking || Int(now.timeIntervalSinceReferenceDate * 2) % 2 == 0,
                                         colonBlink: left > 0 && left < 100 * 3600, now: now,
                                         width: clockWidth(for: text),
-                                        onTitle: openCalendarApp)
+                                        onTitle: { openCalendarApp(next.showURL) })
                         } else {
                             Text(calendar.summary)
                                 .foregroundStyle(Color(red: 0xcc / 255, green: 0xcc / 255, blue: 0xdd / 255))
@@ -443,8 +443,9 @@ struct DropPanelView: View {
         return Color(red: ch(c.r), green: ch(c.g), blue: ch(c.b))
     }
 
-    /// 회의 제목을 누르면 캘린더 앱을 띄운다
-    private func openCalendarApp() {
+    /// 회의 제목을 누르면 캘린더 앱에서 그 일정을 연다. 주소가 없거나 열지 못하면 캘린더 앱만 띄운다.
+    private func openCalendarApp(_ event: URL? = nil) {
+        if let event, NSWorkspace.shared.open(event) { return }
         NSWorkspace.shared.open(URL(fileURLWithPath: "/System/Applications/Calendar.app"))
     }
 
