@@ -488,7 +488,7 @@ struct DropPanelView: View {
     }
 
     /// 잠근 화면의 타이머 버튼: +3, +5분 / 다음 10분 단위(:40 등) / 다음 :30 / 다음 정각.
-    /// 시각 버튼은 늘 지금보다 뒤에 오는 그 분(01:30:00에 :30을 누르면 02:30). 5분 이하로 남으면 곧바로 붉은 화면이 된다.
+    /// 다음 10분 단위가 :30·:00과 같으면 그 버튼은 뺀다. 시각 버튼은 늘 지금보다 뒤에 오는 그 분(01:30:00에 :30을 누르면 02:30). 5분 이하로 남으면 곧바로 붉은 화면이 된다.
     private static func timerChoices(_ now: Date) -> [(label: String, end: Date, title: String)] {
         let cal = Foundation.Calendar.current
         func next(minute: Int) -> Date {
@@ -500,9 +500,10 @@ struct DropPanelView: View {
             return (String(format: ":%02d", minute), end, String(format: "Until %02d:%02d", c.hour ?? 0, c.minute ?? 0))
         }
         let ten = ((cal.component(.minute, from: now) / 10 + 1) * 10) % 60
+        // 다음 10분 단위가 :30이나 :00이면 뒤 버튼과 같으니 뺀다
         return [("+3", now.addingTimeInterval(180), "3-Minute Timer"),
-                ("+5", now.addingTimeInterval(300), "5-Minute Timer"),
-                mark(ten), mark(30), mark(0)]
+                ("+5", now.addingTimeInterval(300), "5-Minute Timer")]
+            + (ten == 30 || ten == 0 ? [] : [mark(ten)]) + [mark(30), mark(0)]
     }
 
     /// 하늘색 #87ceeb: 퇴근 알림 시계, "지금" 버튼 롤오버
