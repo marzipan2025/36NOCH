@@ -436,10 +436,10 @@ struct DropPanelView: View {
         return (1, 0xd7 / 255, 0)
     }
 
-    /// 제목 색: 시계 색의 70%에 흰색을 20% 섞는다. 누를 수 있는 제목에 마우스를 올리면 20% 더(40%).
+    /// 제목 색: 시계 색에 흰색을 20% 섞는다. 누를 수 있는 제목에 마우스를 올리면 20% 더(40%).
     private func titleColor(_ c: (r: Double, g: Double, b: Double), hover: Bool) -> Color {
         let mix = hover ? 0.4 : 0.2
-        func ch(_ v: Double) -> Double { v * 0.7 * (1 - mix) + mix }
+        func ch(_ v: Double) -> Double { v * (1 - mix) + mix }
         return Color(red: ch(c.r), green: ch(c.g), blue: ch(c.b))
     }
 
