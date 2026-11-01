@@ -608,8 +608,8 @@ struct DropPanelView: View {
     /// 흐린 경계가 모양의 아래 모서리 곡선을 따라가므로, 모서리 쪽에서는 검정이 위로 휘어 올라간다.
     private var blackCover: some View {
         let extraTop: CGFloat = 120
-        // 타이머 중엔 노치가 72 낮아지므로, 검정 아래 끝을 24 더 내려 제목이 검정 위에 오게 한다
-        let lift = tuning.timerEnd != nil ? tuning.lift - 24 : tuning.lift
+        // 타이머 중엔 노치가 72 낮아지므로, 검정 아래 끝을 16 더 내려 제목이 검정 위에 오게 한다
+        let lift = tuning.timerEnd != nil ? tuning.lift - 16 : tuning.lift
         let height = max(0, popupSize.height - lift + extraTop)
         return RoundedRectangle(cornerRadius: tuning.blackRadius)
             .fill(.black)
