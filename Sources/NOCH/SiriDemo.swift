@@ -327,7 +327,7 @@ struct DropPanelView: View {
             ZStack(alignment: .topLeading) {
                 // 계정을 고르는 동안은 하단 캡슐(흰 곳)을 없앤다.
                 tray(Color.white.opacity(tuning.trayOpacity))
-                    .opacity(trayShown && !calendar.picking ? 1 : 0)
+                    .opacity(trayShown && !calendar.picking && tuning.timerEnd == nil ? 1 : 0)
                 rim
                 // 왼쪽: 남은 시간(금색) 아래에 회의 제목(어두운 금색). 오른쪽: 날짜·시각 두 줄.
                 // 0.5초마다 다시 그린다(남은 시간, 퇴근 알림, 00:00 깜빡임, 콜론 깜빡임).
@@ -436,6 +436,7 @@ struct DropPanelView: View {
         }
         // 계정 고르기로 팝업 높이가 바뀔 때 부드럽게
         .animation(.spring(duration: 0.45, bounce: 0.15), value: calendar.picking)
+        .animation(.spring(duration: 0.45, bounce: 0.15), value: tuning.timerEnd != nil)  // 타이머: 캡슐을 빼고 그만큼 낮게
         .animation(.spring(duration: 0.45, bounce: 0.15), value: calendar.accounts.count)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
@@ -585,7 +586,7 @@ struct DropPanelView: View {
             .frame(width: popupSize.width, height: popupSize.height, alignment: .topLeading)
             .mask {
                 Rectangle()
-                    .overlay { tray(Color.black).opacity(trayShown && !calendar.picking ? 1 : 0).blendMode(.destinationOut) }
+                    .overlay { tray(Color.black).opacity(trayShown && !calendar.picking && tuning.timerEnd == nil ? 1 : 0).blendMode(.destinationOut) }
                     .compositingGroup()
             }
             .clipShape(popupShape)
@@ -1096,10 +1097,11 @@ extension DropTuning {
         contentTop(metrics: metrics) + popupHeight(calendar: calendar, metrics: metrics) - textTop
     }
 
-    /// 지금 팝업 높이. 캘린더 계정을 고르는 동안은 목록이 다 들어가게 늘린다(아래 여백 18).
+    /// 지금 팝업 높이. 타이머가 도는 동안은 하단 캡슐 높이만큼 낮게. 캘린더 계정을 고르는 동안은 목록이 다 들어가게 늘린다(아래 여백 18).
     /// 다만 화면 높이의 절반, 그리고 노치 패널(620) 안에 그림자까지 들어가는 높이를 넘지 않는다. 넘치면 목록이 스크롤된다.
     @MainActor
     func popupHeight(calendar: CalendarFeed, metrics: NotchMetrics) -> CGFloat {
+        if timerEnd != nil { return popupHeight - trayHeight }  // 타이머가 도는 동안은 하단 캡슐을 빼고 그 높이만큼 낮춘다
         guard calendar.picking, calendar.status != .denied, !calendar.accounts.isEmpty else { return popupHeight }
         let top = contentTop(metrics: metrics) - textTop  // 화면 위 끝 ~ 예전 팝업 위 끝에 해당하는 곳
         let n = CGFloat(calendar.accounts.count)
