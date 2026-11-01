@@ -1101,7 +1101,7 @@ extension DropTuning {
     /// 다만 화면 높이의 절반, 그리고 노치 패널(620) 안에 그림자까지 들어가는 높이를 넘지 않는다. 넘치면 목록이 스크롤된다.
     @MainActor
     func popupHeight(calendar: CalendarFeed, metrics: NotchMetrics) -> CGFloat {
-        if timerEnd != nil { return popupHeight - trayHeight }  // 타이머가 도는 동안은 하단 캡슐을 빼고 그 높이만큼 낮춘다
+        if timerEnd != nil { return popupHeight - trayHeight - 24 }  // 타이머가 도는 동안은 하단 캡슐을 빼고 그 높이 + 24만큼 낮춘다
         guard calendar.picking, calendar.status != .denied, !calendar.accounts.isEmpty else { return popupHeight }
         let top = contentTop(metrics: metrics) - textTop  // 화면 위 끝 ~ 예전 팝업 위 끝에 해당하는 곳
         let n = CGFloat(calendar.accounts.count)
