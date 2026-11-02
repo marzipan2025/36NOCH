@@ -79,6 +79,8 @@ final class DropTuning: ObservableObject {
         .flatMap { Double($0.dropFirst(11)) }.map { CGFloat($0) } ?? 0
     /// 타이머 화면으로 낮출지. 화면이 어두운 동안은 슬라이더로 어둠을 끌 수 있게 캡슐과 원래 높이를 둔다.
     var timerCompact: Bool { timerEnd != nil && dimValue == 0 }
+    /// 캡슐 불투명도: 화면이 어두워지는 만큼 줄어들고 0.1 아래로는 내려가지 않는다.
+    var trayShownOpacity: CGFloat { max(0.1, trayOpacity * (1 - dimValue)) }
     /// 노치 판(유리·테두리 빛)과 아이콘을 보일 정도. 슬라이더 마지막 10%에서 사라져, 완전히 어두우면 글·캡슐·헤드만 남는다.
     var notchBodyOpacity: CGFloat { min(1, (1 - dimValue) / 0.1) }
     /// now 버튼을 눌러 잠그면 true: 마우스가 나가도 닫지 않는다. 다시 누르면 풀리고, 그 뒤 마우스가 나가면 닫힌다(저장 안 함).
@@ -372,7 +374,7 @@ struct DropPanelView: View {
                 // 계정을 고르는 동안은 하단 캡슐을 없앤다.
                 TimelineView(.periodic(from: Date(timeIntervalSinceReferenceDate: Date().timeIntervalSinceReferenceDate.rounded(.down)), by: 0.5)) { context in
                     let color = shownClockColor(context.date)
-                    tray(Color(red: color.r, green: color.g, blue: color.b).opacity(tuning.trayOpacity))
+                    tray(Color(red: color.r, green: color.g, blue: color.b).opacity(tuning.trayShownOpacity))
                 }
                 .opacity(trayShown && !calendar.picking && !tuning.timerCompact ? 1 : 0)
                 rim.opacity(tuning.notchBodyOpacity)
@@ -487,15 +489,18 @@ struct DropPanelView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
-    /// 하단 캡슐의 슬라이더 헤드: 유리 원. 캡슐 위·아래·좌우 끝과 4 띄우고 왼쪽 끝에서 오른쪽 끝까지 끈다.
+    /// 하단 캡슐의 슬라이더 헤드: 그림자를 둔 시계 색 원. 캡슐 위·아래·좌우 끝과 4 띄우고 왼쪽 끝에서 오른쪽 끝까지 끈다.
     private var trayHead: some View {
         let gap: CGFloat = 4
         let size = max(0, tuning.trayHeight - gap * 2)
         let travel = max(1, popupSize.width - tuning.trayMargin * 2 - gap * 2 - size)
         let shown = trayShown && !calendar.picking && !tuning.timerCompact
-        return Color.clear
+        return TimelineView(.periodic(from: Date(timeIntervalSinceReferenceDate: Date().timeIntervalSinceReferenceDate.rounded(.down)), by: 0.5)) { context in
+            let color = shownClockColor(context.date)
+            Circle().fill(Color(red: color.r, green: color.g, blue: color.b))
+        }
             .frame(width: size, height: size)
-            .glassEffect(.clear, in: Circle())
+            .shadow(color: .black.opacity(0.3), radius: 20, y: 12)
             .contentShape(Circle())
             // 헤드가 손을 따라 움직이므로 움직이지 않는 전역 좌표로 잰다
             .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .global)
