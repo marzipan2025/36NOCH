@@ -337,7 +337,7 @@ struct DropPanelView: View {
                     // 스크롤 영역은 노치 위 끝 ~ 아래 끝 전체(아래 .padding(.top)을 되돌린다). 첫 화면은 글 줄 자리에서 시작하고
                     // 마지막 줄 아래 여백은 18. 계정마다 검정 상자에 담기므로 아래 투명한 유리까지 내려가도 읽힌다.
                     AccountPicker(calendar: calendar, textSize: tuning.textSize,
-                                  onLater: { calendar.later(); tuning.isOpen = false },
+                                  onLater: { calendar.later(); if !tuning.locked { tuning.isOpen = false } },  // 잠근 동안은 닫지 않고 원래 화면으로
                                   topInset: tuning.contentTop(metrics: metrics), bottomInset: 18, fadeTop: metrics.height)
                         .frame(height: popupSize.height)
                         .padding(.top, -tuning.contentTop(metrics: metrics))
@@ -609,7 +609,7 @@ struct DropPanelView: View {
     private var blackCover: some View {
         let extraTop: CGFloat = 120
         // 타이머 중엔 노치가 72 낮아지므로, 검정 아래 끝을 16 더 내려 제목이 검정 위에 오게 한다
-        let lift = tuning.timerEnd != nil ? tuning.lift - 16 : tuning.lift
+        let lift = tuning.timerEnd != nil && !calendar.picking ? tuning.lift - 16 : tuning.lift
         let height = max(0, popupSize.height - lift + extraTop)
         return RoundedRectangle(cornerRadius: tuning.blackRadius)
             .fill(.black)
@@ -1103,7 +1103,7 @@ extension DropTuning {
     /// 다만 화면 높이의 절반, 그리고 노치 패널(620) 안에 그림자까지 들어가는 높이를 넘지 않는다. 넘치면 목록이 스크롤된다.
     @MainActor
     func popupHeight(calendar: CalendarFeed, metrics: NotchMetrics) -> CGFloat {
-        if timerEnd != nil { return popupHeight - trayHeight - 24 }  // 타이머가 도는 동안은 하단 캡슐을 빼고 그 높이 + 24만큼 낮춘다
+        if timerEnd != nil && !calendar.picking { return popupHeight - trayHeight - 24 }  // 타이머가 도는 동안은 하단 캡슐을 빼고 그 높이 + 24만큼 낮춘다(계정을 고르는 동안은 예외)
         guard calendar.picking, calendar.status != .denied, !calendar.accounts.isEmpty else { return popupHeight }
         let top = contentTop(metrics: metrics) - textTop  // 화면 위 끝 ~ 예전 팝업 위 끝에 해당하는 곳
         let n = CGFloat(calendar.accounts.count)
