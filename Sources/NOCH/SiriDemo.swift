@@ -29,10 +29,10 @@ final class DropTuning: ObservableObject {
     @Published var sideInset: CGFloat = 0.5          // 양옆에서 들임. 키우면 옆 가장자리에 유리가 더 드러남
     @Published var blackOpacity: CGFloat = 1
     @Published var overBlack: CGFloat = 0.7          // 같은 검정 모양을 유리 "위"에도 이만큼 덧칠. 유리가 검정을 밝혀 보이게 하는 만큼 다시 어둡게
-    // 하단 캡슐: 노치 아래쪽 안에 둔 흰 반투명 면(좌우 반원). 이 안에는 검정이 들어오지 않는다.
+    // 하단 캡슐: 노치 아래쪽 안에 둔 시계 색 반투명 면(좌우 반원). 이 안에는 검정이 들어오지 않는다.
     @Published var trayHeight: CGFloat = 48
     @Published var trayMargin: CGFloat = 37          // 좌우·아래 여백
-    @Published var trayOpacity: CGFloat = 0.2        // 흰색 불투명도
+    @Published var trayOpacity: CGFloat = 0.2        // 시계 색의 불투명도
     @Published var trayDelay: CGFloat = -0.2         // 팝업 등장이 끝나고 이만큼 뒤에 나타난다(초). 음수면 끝나기 전
     @Published var trayFade: CGFloat = 0.3           // 나타나고 사라지는 시간(초). 닫을 때는 닫힘 시작과 함께 사라진다
     // 덧그린 테두리 빛
@@ -352,9 +352,12 @@ struct DropPanelView: View {
 
             // 유리 위에 얹는 것: 하단 영역, 테두리 빛, 글
             ZStack(alignment: .topLeading) {
-                // 계정을 고르는 동안은 하단 캡슐(흰 곳)을 없앤다.
-                tray(Color.white.opacity(tuning.trayOpacity))
-                    .opacity(trayShown && !calendar.picking && tuning.timerEnd == nil ? 1 : 0)
+                // 계정을 고르는 동안은 하단 캡슐을 없앤다.
+                TimelineView(.periodic(from: Date(timeIntervalSinceReferenceDate: Date().timeIntervalSinceReferenceDate.rounded(.down)), by: 0.5)) { context in
+                    let color = shownClockColor(context.date)
+                    tray(Color(red: color.r, green: color.g, blue: color.b).opacity(tuning.trayOpacity))
+                }
+                .opacity(trayShown && !calendar.picking && tuning.timerEnd == nil ? 1 : 0)
                 rim
                 // 왼쪽: 남은 시간(금색) 아래에 회의 제목(어두운 금색). 오른쪽: 날짜·시각 두 줄.
                 // 0.5초마다 다시 그린다(남은 시간, 퇴근 알림, 00:00 깜빡임, 콜론 깜빡임).
@@ -493,6 +496,22 @@ struct DropPanelView: View {
                     y: popupSize.height - tuning.trayMargin - tuning.trayHeight + gap)
             .opacity(shown ? 1 : 0)
             .allowsHitTesting(shown)
+    }
+
+    /// 지금 시계 자리에 보이는 색. 시계 자리에 무엇을 보일지 고르는 위 규칙과 같은 순서다.
+    /// 시계가 없을 때(일정 없음)는 오른쪽 글과 같은 #ccccdd.
+    private func shownClockColor(_ now: Date) -> (r: Double, g: Double, b: Double) {
+        let start = calendar.next.map { $0.start.addingTimeInterval(CommandLine.arguments.contains("--test-long-countdown") ? 12 * 3600 : 0) }
+        let meetingFirst = start.map { $0.timeIntervalSince(now) <= 10 * 60 && $0.timeIntervalSince(now) > -CalendarFeed.blink } ?? false
+        let timerLeft = tuning.timerEnd?.timeIntervalSince(now)
+        if hoverNow || (tuning.locked && !meetingFirst && timerLeft == nil) { return Self.sky }
+        if !meetingFirst, let left = timerLeft { return clockColor(alert: left <= 5 * 60, left: left) }
+        if GoHome.isTime(now, seconds: GoHome.seconds + 2) && !meetingFirst { return Self.sky }
+        if let start {
+            let left = start.timeIntervalSince(now)
+            return clockColor(alert: left <= 5 * 60 || (left > 10 * 60 - 10 && left <= 10 * 60), left: left)
+        }
+        return (0xcc / 255, 0xcc / 255, 0xdd / 255)
     }
 
     /// 왼쪽 시계와 그 아래 제목. 너비를 고정한 시계는 글자 수가 줄면 커져 아래로 늘어나고 제목은 그만큼 밀린다.
