@@ -220,6 +220,13 @@ struct DropPanelView: View {
             // 가장자리에서는 유리의 렌즈 효과로 검정이 모서리를 따라 휜다. (위에 덮으면 매트한 평면이 된다)
             popupLayers
 
+            // 맨 위 끝은 늘 불투명한 검정. 검정이 걷히는 동안(열리고 약 0.4~0.65초) 맨 윗줄에 옅은 회색 선이
+            // 비쳐서 노치가 화면 위 끝에서 떨어져 보였다(2026-11-02 회사 맥 화면 기록). 마스크 없이 사각형으로만 잘라 덮는다.
+            popupShape.fill(.black)
+                .frame(width: shapeFrameWidth, height: popupSize.height)
+                .frame(height: 4, alignment: .top)
+                .clipped()
+
             notchButtons
         }
         // 계정 고르기로 팝업 높이가 바뀔 때 부드럽게. 그림자도 같이 움직이도록 맨 바깥에 건다
@@ -326,13 +333,15 @@ struct DropPanelView: View {
             popupShape.fill(.black)
                 .frame(width: shapeFrameWidth, height: popupSize.height)
                 .mask {
-                    // 위에서 잰 고정 길이라 노치 높이가 바뀌어도 그라데이션은 그대로
-                    LinearGradient(stops: [.init(color: .black, location: 0),
-                                           .init(color: .black, location: metrics.height / (metrics.height + 60)),
-                                           .init(color: .clear, location: 1)],
-                                   startPoint: .top, endPoint: .bottom)
-                        .frame(height: metrics.height + 60)
-                        .frame(maxHeight: .infinity, alignment: .top)
+                    // 위에서 잰 고정 길이라 노치 높이가 바뀌어도 그라데이션은 그대로.
+                    // overlay로 위 끝에 고정한다. frame만 쓰면 모양이 이 길이보다 낮을 때 가운데 정렬되어 위로 밀린다.
+                    Color.clear.overlay(alignment: .top) {
+                        LinearGradient(stops: [.init(color: .black, location: 0),
+                                               .init(color: .black, location: metrics.height / (metrics.height + 60)),
+                                               .init(color: .clear, location: 1)],
+                                       startPoint: .top, endPoint: .bottom)
+                            .frame(height: metrics.height + 60)
+                    }
                 }
             // (글보다 아래에 깐다. 위에 덮으면 시계·글 윗부분이 검정에 가려 어두워진다)
 
