@@ -465,55 +465,34 @@ struct DropPanelView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
-    /// 하단 캡슐의 슬라이더 헤드: 그림자를 둔 시계 색 원. 캡슐 위·아래·좌우 끝과 2 띄우고 왼쪽 끝에서 오른쪽 끝까지 끈다.
+    /// 하단 캡슐의 슬라이더 헤드: 유리 원. 캡슐 위·아래·좌우 끝과 2 띄우고 왼쪽 끝에서 오른쪽 끝까지 끈다.
     private var trayHead: some View {
         let gap: CGFloat = 2
         let size = max(0, tuning.trayHeight - gap * 2)
         let travel = max(1, popupSize.width - tuning.trayMargin * 2 - gap * 2 - size)
         let shown = trayShown && !calendar.picking && tuning.timerEnd == nil
-        return TimelineView(.periodic(from: Date(timeIntervalSinceReferenceDate: Date().timeIntervalSinceReferenceDate.rounded(.down)), by: 0.5)) { context in
-            let color = shownClockColor(context.date)
-            Circle()
-                .fill(Color(red: color.r, green: color.g, blue: color.b))
-                .frame(width: size, height: size)
-                .shadow(color: .black.opacity(0.4), radius: 4, y: 2)
-                .contentShape(Circle())
-                // 헤드가 손을 따라 움직이므로 움직이지 않는 전역 좌표로 잰다
-                .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .global)
-                    .onChanged { drag in
-                        let start = trayHeadStart ?? trayHeadValue
-                        trayHeadStart = start
-                        tuning.trayHeadDragging = true
-                        trayHeadValue = min(1, max(0, start + drag.translation.width / travel))
-                    }
-                    .onEnded { _ in
-                        trayHeadStart = nil
-                        tuning.trayHeadDragging = false
-                        // 55%를 넘겨 놓으면 오른쪽 끝으로, 아니면 왼쪽 끝으로 돌아간다
-                        withAnimation(.easeIn(duration: 0.22)) { trayHeadValue = trayHeadValue > 0.55 ? 1 : 0 }
-                    })
-        }
-        .frame(width: size, height: size)
-        .offset(x: tuning.trayMargin + gap + trayHeadValue * travel,
-                y: popupSize.height - tuning.trayMargin - tuning.trayHeight + gap)
-        .opacity(shown ? 1 : 0)
-        .allowsHitTesting(shown)
-    }
-
-    /// 지금 시계 자리에 보이는 색. 시계 자리에 무엇을 보일지 고르는 위 규칙과 같은 순서다.
-    /// 시계가 없을 때(일정 없음)는 오른쪽 글과 같은 #ccccdd.
-    private func shownClockColor(_ now: Date) -> (r: Double, g: Double, b: Double) {
-        let start = calendar.next.map { $0.start.addingTimeInterval(CommandLine.arguments.contains("--test-long-countdown") ? 12 * 3600 : 0) }
-        let meetingFirst = start.map { $0.timeIntervalSince(now) <= 10 * 60 && $0.timeIntervalSince(now) > -CalendarFeed.blink } ?? false
-        let timerLeft = tuning.timerEnd?.timeIntervalSince(now)
-        if hoverNow || (tuning.locked && !meetingFirst && timerLeft == nil) { return Self.sky }
-        if !meetingFirst, let left = timerLeft { return clockColor(alert: left <= 5 * 60, left: left) }
-        if GoHome.isTime(now, seconds: GoHome.seconds + 2) && !meetingFirst { return Self.sky }
-        if let start {
-            let left = start.timeIntervalSince(now)
-            return clockColor(alert: left <= 5 * 60 || (left > 10 * 60 - 10 && left <= 10 * 60), left: left)
-        }
-        return (0xcc / 255, 0xcc / 255, 0xdd / 255)
+        return Color.clear
+            .frame(width: size, height: size)
+            .glassEffect(.clear, in: Circle())
+            .contentShape(Circle())
+            // 헤드가 손을 따라 움직이므로 움직이지 않는 전역 좌표로 잰다
+            .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .global)
+                .onChanged { drag in
+                    let start = trayHeadStart ?? trayHeadValue
+                    trayHeadStart = start
+                    tuning.trayHeadDragging = true
+                    trayHeadValue = min(1, max(0, start + drag.translation.width / travel))
+                }
+                .onEnded { _ in
+                    trayHeadStart = nil
+                    tuning.trayHeadDragging = false
+                    // 55%를 넘겨 놓으면 오른쪽 끝으로, 아니면 왼쪽 끝으로 돌아간다
+                    withAnimation(.easeIn(duration: 0.22)) { trayHeadValue = trayHeadValue > 0.55 ? 1 : 0 }
+                })
+            .offset(x: tuning.trayMargin + gap + trayHeadValue * travel,
+                    y: popupSize.height - tuning.trayMargin - tuning.trayHeight + gap)
+            .opacity(shown ? 1 : 0)
+            .allowsHitTesting(shown)
     }
 
     /// 왼쪽 시계와 그 아래 제목. 너비를 고정한 시계는 글자 수가 줄면 커져 아래로 늘어나고 제목은 그만큼 밀린다.
