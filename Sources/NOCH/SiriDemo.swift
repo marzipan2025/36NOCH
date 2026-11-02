@@ -226,6 +226,7 @@ struct DropPanelView: View {
                 .frame(width: shapeFrameWidth, height: popupSize.height)
                 .frame(height: 4, alignment: .top)
                 .clipped()
+                .allowsHitTesting(false)  // clipped는 그림만 자른다. 끄지 않으면 노치 전체 모양이 아래 버튼의 마우스를 가로챈다
 
             notchButtons
         }
