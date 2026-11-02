@@ -6,7 +6,7 @@ import SwiftUI
 
 import Combine
 
-/// 모든 조절 값. 기본값은 2026-10-31 사용자가 맞춘 11차 설정.
+/// 모든 조절 값. 기본값은 2026-11-02 사용자가 맞춘 12차 설정.
 /// 바꾼 값은 UserDefaults에 저장해서 앱을 다시 켜도 이어진다.
 final class DropTuning: ObservableObject {
     // 노치 확장
@@ -24,23 +24,23 @@ final class DropTuning: ObservableObject {
     @Published var tintOpacity: CGFloat = 0.05
     // 검정 덮개: 팝업 모양을 위로 끌어올려 흐리게 만든 검정. 흐린 경계가 모서리 곡선을 따라 휜다.
     @Published var lift: CGFloat = 65.5              // 검정 아래 끝을 팝업 아래 끝보다 얼마나 위로
-    @Published var softness: CGFloat = 37          // 흐림 = 검정이 사라지는 구간 길이
-    @Published var blackRadius: CGFloat = 44         // 검정 모양의 아래 모서리 반지름(휘어짐 정도)
-    @Published var sideInset: CGFloat = -1          // 양옆에서 들임. 키우면 옆 가장자리에 유리가 더 드러남
+    @Published var softness: CGFloat = 34          // 흐림 = 검정이 사라지는 구간 길이
+    @Published var blackRadius: CGFloat = 34         // 검정 모양의 아래 모서리 반지름(휘어짐 정도)
+    @Published var sideInset: CGFloat = 0.5          // 양옆에서 들임. 키우면 옆 가장자리에 유리가 더 드러남
     @Published var blackOpacity: CGFloat = 1
-    @Published var overBlack: CGFloat = 0.65          // 같은 검정 모양을 유리 "위"에도 이만큼 덧칠. 유리가 검정을 밝혀 보이게 하는 만큼 다시 어둡게
+    @Published var overBlack: CGFloat = 0.7          // 같은 검정 모양을 유리 "위"에도 이만큼 덧칠. 유리가 검정을 밝혀 보이게 하는 만큼 다시 어둡게
     // 하단 캡슐: 노치 아래쪽 안에 둔 흰 반투명 면(좌우 반원). 이 안에는 검정이 들어오지 않는다.
     @Published var trayHeight: CGFloat = 48
-    @Published var trayMargin: CGFloat = 36          // 좌우·아래 여백
-    @Published var trayOpacity: CGFloat = 0.1        // 흰색 불투명도
+    @Published var trayMargin: CGFloat = 37          // 좌우·아래 여백
+    @Published var trayOpacity: CGFloat = 0.2        // 흰색 불투명도
     @Published var trayDelay: CGFloat = -0.2         // 팝업 등장이 끝나고 이만큼 뒤에 나타난다(초). 음수면 끝나기 전
     @Published var trayFade: CGFloat = 0.3           // 나타나고 사라지는 시간(초). 닫을 때는 닫힘 시작과 함께 사라진다
     // 덧그린 테두리 빛
-    @Published var rimOpacity: CGFloat = 0.05        // 유리 자체 테두리 위에 아주 살짝
-    @Published var rimWidth: CGFloat = 1
-    @Published var rimSoftness: CGFloat = 1
+    @Published var rimOpacity: CGFloat = 0.1        // 유리 자체 테두리 위에 아주 살짝
+    @Published var rimWidth: CGFloat = 2
+    @Published var rimSoftness: CGFloat = 3
     // 바깥 그림자
-    @Published var shadowOpacity: CGFloat = 0.3
+    @Published var shadowOpacity: CGFloat = 0.4
     @Published var shadowRadius: CGFloat = 28
     @Published var shadowY: CGFloat = 14.5
     // 글: 확정한 값이라 설정창·저장에서 뺐다(2026-10-30)
@@ -80,14 +80,15 @@ final class DropTuning: ObservableObject {
     @Published var timerEnd: Date? = CommandLine.arguments.contains("--test-timer") ? Date().addingTimeInterval(180) : nil
     var timerTitle = CommandLine.arguments.contains("--test-timer") ? "3-Minute Timer" : ""
 
-    /// 11차 설정(= 기본값): 2026-10-31 집 맥. 10차에서 하단 캡슐 좌우·아래 여백 31.5 → 36.
+    /// 12차 설정(= 기본값): 2026-11-02. 11차에서 검정 흐림 37 → 34, 모서리 44 → 34, 양옆 −1 → 0.5, 덧칠 0.65 → 0.7,
+    /// 하단 캡슐 여백 36 → 37·불투명도 0.1 → 0.2, 테두리 빛 0.05 → 0.1·굵기 1 → 2·흐림 1 → 3, 그림자 0.3 → 0.4.
     /// 조절하다가 이 값으로 되돌릴 때 쓴다.
-    func applyEleventhPreset() {
+    func applyTwelfthPreset() {
         growWidth = 80; restWide = true; restWidth = 44; grownTopRadius = 21.5; popupHeight = 232
         inkDelay = 0; inkDuration = 0.65; inkNeck = true; clearGlass = true; tintOpacity = 0.05
-        lift = 65.5; softness = 37; blackRadius = 44; sideInset = -1; blackOpacity = 1; overBlack = 0.65
-        trayHeight = 48; trayMargin = 36; trayOpacity = 0.1; trayDelay = -0.2; trayFade = 0.3
-        rimOpacity = 0.05; rimWidth = 1; rimSoftness = 1; shadowOpacity = 0.3; shadowRadius = 28
+        lift = 65.5; softness = 34; blackRadius = 34; sideInset = 0.5; blackOpacity = 1; overBlack = 0.7
+        trayHeight = 48; trayMargin = 37; trayOpacity = 0.2; trayDelay = -0.2; trayFade = 0.3
+        rimOpacity = 0.1; rimWidth = 2; rimSoftness = 3; shadowOpacity = 0.4; shadowRadius = 28
         shadowY = 14.5; growDuration = 0.6
         growBounce = 0.2; closeSpeed = 0.5
     }
@@ -753,7 +754,7 @@ struct DropControlView: View {
                 Button("닫기") { tuning.isOpen = false }
                 Button("다시 재생") { replay() }
                 Spacer()
-                Button("11차설정") { tuning.applyEleventhPreset(); replay() }
+                Button("12차설정") { tuning.applyTwelfthPreset(); replay() }
                 Button("종료") { NSApp.terminate(nil) }
             }
             .padding(16)
