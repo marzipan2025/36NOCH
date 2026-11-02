@@ -79,6 +79,8 @@ final class DropTuning: ObservableObject {
         .flatMap { Double($0.dropFirst(11)) }.map { CGFloat($0) } ?? 0
     /// 타이머 화면으로 낮출지. 화면이 어두운 동안은 슬라이더로 어둠을 끌 수 있게 캡슐과 원래 높이를 둔다.
     var timerCompact: Bool { timerEnd != nil && dimValue == 0 }
+    /// 노치 판(유리·테두리 빛)과 아이콘을 보일 정도. 슬라이더 마지막 10%에서 사라져, 완전히 어두우면 글·캡슐·헤드만 남는다.
+    var notchBodyOpacity: CGFloat { min(1, (1 - dimValue) / 0.1) }
     /// now 버튼을 눌러 잠그면 true: 마우스가 나가도 닫지 않는다. 다시 누르면 풀리고, 그 뒤 마우스가 나가면 닫힌다(저장 안 함).
     @Published var locked = CommandLine.arguments.contains("--test-locked") || CommandLine.arguments.contains("--test-timer")  // 시험용: `--test-open --test-locked`
     /// 잠근 화면의 버튼(+3, +5, :40, :30, :00)으로 건 타이머가 끝나는 시각과 제목. 끝나면(00:00 깜빡임 뒤) 잠금과 함께 풀린다.
@@ -238,6 +240,8 @@ struct DropPanelView: View {
                 .allowsHitTesting(false)  // clipped는 그림만 자른다. 끄지 않으면 노치 전체 모양이 아래 버튼의 마우스를 가로챈다
 
             notchButtons
+                .opacity(tuning.notchBodyOpacity)
+                .allowsHitTesting(tuning.notchBodyOpacity > 0)
         }
         // 계정 고르기로 팝업 높이가 바뀔 때 부드럽게. 그림자도 같이 움직이도록 맨 바깥에 건다
         .animation(.spring(duration: 0.45, bounce: 0.15), value: calendar.picking)
@@ -334,6 +338,7 @@ struct DropPanelView: View {
                 // 검정 노치보다 넓고 위 모서리가 볼록하게 둥근 유리가 드러나 노치가 화면 위에서 떨어져 보였다.
                 // SwiftUI가 매 프레임 그리는 같은 모양으로 잘라 늘 검정 노치 안에만 보이게 한다.
                 .mask { popupShape.fill(.black).frame(width: shapeFrameWidth, height: popupSize.height) }
+                .opacity(tuning.notchBodyOpacity)
 
             // 덧칠: 유리 아래 검정만으로는 유리가 빛을 더해 덜 검게 보인다. 같은 모양을 유리 위에 반투명으로 한 번 더.
             // 위에 덮는 만큼 유리 질감도 가려지므로 불투명도로 맞춘다(1이면 처음의 매트한 평면과 같아짐).
@@ -370,7 +375,7 @@ struct DropPanelView: View {
                     tray(Color(red: color.r, green: color.g, blue: color.b).opacity(tuning.trayOpacity))
                 }
                 .opacity(trayShown && !calendar.picking && !tuning.timerCompact ? 1 : 0)
-                rim
+                rim.opacity(tuning.notchBodyOpacity)
                 // 왼쪽: 남은 시간(금색) 아래에 회의 제목(어두운 금색). 오른쪽: 날짜·시각 두 줄.
                 // 0.5초마다 다시 그린다(남은 시간, 퇴근 알림, 00:00 깜빡임, 콜론 깜빡임).
                 // 초 경계에서 시작해 숫자와 콜론이 같은 순간에 바뀌게 한다.
@@ -458,6 +463,8 @@ struct DropPanelView: View {
                                 .frame(width: 14, height: 14)
                                 .offset(x: 1)  // 날짜 글 오른쪽 끝보다 1 오른쪽
                                 .contentShape(Rectangle().inset(by: -6))
+                                .opacity(tuning.notchBodyOpacity)
+                                .allowsHitTesting(tuning.notchBodyOpacity > 0)
                                 .onHover { hoverNow = $0 }
                                 .onTapGesture {  // 잠그기/풀기. 풀면 돌던 타이머도 바로 끈다
                                     if tuning.locked { tuning.locked = false; tuning.timerEnd = nil } else { tuning.locked = true }
