@@ -227,6 +227,12 @@ struct DropPanelView: View {
             if open { calendar.reload() }
             play(open: open)
         }
+        .task {
+            // 시험용: `--test-timer-cancel` 이면 5초 뒤 now를 누른 것처럼 타이머만 끈다(`--test-open --test-timer`와 함께)
+            guard CommandLine.arguments.contains("--test-timer-cancel") else { return }
+            try? await Task.sleep(for: .seconds(5))
+            tuning.timerEnd = nil  // 실제로는 마우스가 노치 안에 있으니, 닫히지 않게 잠금은 둔다
+        }
     }
 
     /// 노치 좌우의 14pt 아이콘 버튼 두 개(IconShape.left / right, 다운로드한 SVG). 닫혀 있을 때는 실제(하드웨어) 노치 좌우 끝에 바짝 붙어 #181818,
@@ -316,10 +322,13 @@ struct DropPanelView: View {
             popupShape.fill(.black)
                 .frame(width: shapeFrameWidth, height: popupSize.height)
                 .mask {
+                    // 위에서 잰 고정 길이라 노치 높이가 바뀌어도 그라데이션은 그대로
                     LinearGradient(stops: [.init(color: .black, location: 0),
-                                           .init(color: .black, location: metrics.height / max(popupSize.height, 1)),
-                                           .init(color: .clear, location: min(1, (metrics.height + 60) / max(popupSize.height, 1)))],
+                                           .init(color: .black, location: metrics.height / (metrics.height + 60)),
+                                           .init(color: .clear, location: 1)],
                                    startPoint: .top, endPoint: .bottom)
+                        .frame(height: metrics.height + 60)
+                        .frame(maxHeight: .infinity, alignment: .top)
                 }
             // (글보다 아래에 깐다. 위에 덮으면 시계·글 윗부분이 검정에 가려 어두워진다)
 
@@ -607,15 +616,16 @@ struct DropPanelView: View {
     /// 팝업 모양을 위로 길게 늘여 그린 뒤 흐리게 한다.
     /// 흐린 경계가 모양의 아래 모서리 곡선을 따라가므로, 모서리 쪽에서는 검정이 위로 휘어 올라간다.
     private var blackCover: some View {
-        let extraTop: CGFloat = 120
         // 타이머 중엔 노치가 72 낮아지므로, 검정 아래 끝을 16 더 내려 제목이 검정 위에 오게 한다
         let lift = tuning.timerEnd != nil && !calendar.picking ? tuning.lift - 16 : tuning.lift
-        let height = max(0, popupSize.height - lift + extraTop)
+        // 높이를 고정해 흐린 그림을 다시 그리지 않고 옮기기만 한다. 높이가 바뀌면 흐림을 다시 그리느라
+        // 유리보다 늦게 따라와서, 높이가 바뀔 때 유리가 먼저 펴지고 검정이 뒤늦게 바뀌어 보였다.
+        let height: CGFloat = 800
         return RoundedRectangle(cornerRadius: tuning.blackRadius)
             .fill(.black)
             .frame(width: max(0, popupSize.width - tuning.sideInset * 2), height: height)
-            .offset(x: tuning.sideInset, y: -extraTop)
             .blur(radius: tuning.softness)
+            .offset(x: tuning.sideInset, y: popupSize.height - lift - height)
     }
 
     /// 유리 가장자리 빛. 위는 밝게, 옆은 거의 없게, 아래는 다시 살짝 — 빛이 위에서 비치는 유리처럼.
