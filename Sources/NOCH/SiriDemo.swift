@@ -468,9 +468,9 @@ struct DropPanelView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
-    /// 하단 캡슐의 슬라이더 헤드: 유리 원. 캡슐 위·아래·좌우 끝과 2 띄우고 왼쪽 끝에서 오른쪽 끝까지 끈다.
+    /// 하단 캡슐의 슬라이더 헤드: 유리 원. 캡슐 위·아래·좌우 끝과 4 띄우고 왼쪽 끝에서 오른쪽 끝까지 끈다.
     private var trayHead: some View {
-        let gap: CGFloat = 2
+        let gap: CGFloat = 4
         let size = max(0, tuning.trayHeight - gap * 2)
         let travel = max(1, popupSize.width - tuning.trayMargin * 2 - gap * 2 - size)
         let shown = trayShown && !calendar.picking && tuning.timerEnd == nil
