@@ -222,6 +222,10 @@ struct DropPanelView: View {
 
             notchButtons
         }
+        // 계정 고르기로 팝업 높이가 바뀔 때 부드럽게. 그림자도 같이 움직이도록 맨 바깥에 건다
+        .animation(.spring(duration: 0.45, bounce: 0.15), value: calendar.picking)
+        .animation(.spring(duration: 0.45, bounce: 0.15), value: tuning.timerEnd != nil)  // 타이머: 캡슐을 빼고 그만큼 낮게
+        .animation(.spring(duration: 0.45, bounce: 0.15), value: calendar.accounts.count)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onChange(of: tuning.isOpen) { _, open in
             if open { calendar.reload() }
@@ -443,10 +447,6 @@ struct DropPanelView: View {
             .clipShape(popupShape)
             .offset(y: popupTop)
         }
-        // 계정 고르기로 팝업 높이가 바뀔 때 부드럽게
-        .animation(.spring(duration: 0.45, bounce: 0.15), value: calendar.picking)
-        .animation(.spring(duration: 0.45, bounce: 0.15), value: tuning.timerEnd != nil)  // 타이머: 캡슐을 빼고 그만큼 낮게
-        .animation(.spring(duration: 0.45, bounce: 0.15), value: calendar.accounts.count)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
