@@ -73,6 +73,7 @@ final class DropTuning: ObservableObject {
 
     /// 바뀔 때마다 패널이 열기/닫기 모션을 한다. 마우스 위치(SiriDemo)나 설정창 버튼이 바꾼다.
     @Published var isOpen = false
+    var trayHeadDragging = false  // 하단 캡슐의 슬라이더 헤드를 끄는 중. 마우스가 노치 밖으로 나가도 닫지 않는다
     /// now 버튼을 눌러 잠그면 true: 마우스가 나가도 닫지 않는다. 다시 누르면 풀리고, 그 뒤 마우스가 나가면 닫힌다(저장 안 함).
     @Published var locked = CommandLine.arguments.contains("--test-locked") || CommandLine.arguments.contains("--test-timer")  // 시험용: `--test-open --test-locked`
     /// 잠근 화면의 버튼(+3, +5, :40, :30, :00)으로 건 타이머가 끝나는 시각과 제목. 끝나면(00:00 깜빡임 뒤) 잠금과 함께 풀린다.
@@ -167,6 +168,8 @@ struct DropPanelView: View {
     @State private var inked = true       // 커진 노치가 온통 검정인지. 열릴 때 검정으로 커졌다가 아래쪽이 유리로 걷힌다
     @State private var trayShown = false  // 하단 영역. 팝업 등장이 끝난 뒤에 나타난다
     @State private var sequence: Task<Void, Never>?
+    @State private var trayHeadValue: CGFloat = 0        // 슬라이더 헤드 위치(0 = 왼쪽 끝, 1 = 오른쪽 끝)
+    @State private var trayHeadStart: CGFloat?           // 끌기 시작할 때의 위치
 
     // 닫혀 있을 때도 너비를 restWidth만큼 늘여 둘 수 있다(restWide).
     private var notchWidth: CGFloat {
@@ -453,12 +456,64 @@ struct DropPanelView: View {
                     .padding(.horizontal, tuning.textPadding + tuning.uiSideInset)  // 노치 좌우 끝에서 trayMargin + 3(하단 캡슐 좌우 끝보다 3 안쪽)
                     .padding(.top, tuning.contentTop(metrics: metrics))
                     .opacity(dropped ? 1 : 0)
+                trayHead
             }
             .frame(width: popupSize.width, height: popupSize.height, alignment: .topLeading)
             .clipShape(popupShape)
             .offset(y: popupTop)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    /// 하단 캡슐의 슬라이더 헤드: 그림자를 둔 시계 색 원. 캡슐 위·아래·좌우 끝과 2 띄우고 왼쪽 끝에서 오른쪽 끝까지 끈다.
+    private var trayHead: some View {
+        let gap: CGFloat = 2
+        let size = max(0, tuning.trayHeight - gap * 2)
+        let travel = max(1, popupSize.width - tuning.trayMargin * 2 - gap * 2 - size)
+        let shown = trayShown && !calendar.picking && tuning.timerEnd == nil
+        return TimelineView(.periodic(from: Date(timeIntervalSinceReferenceDate: Date().timeIntervalSinceReferenceDate.rounded(.down)), by: 0.5)) { context in
+            let color = shownClockColor(context.date)
+            Circle()
+                .fill(Color(red: color.r, green: color.g, blue: color.b))
+                .frame(width: size, height: size)
+                .shadow(color: .black.opacity(0.4), radius: 4, y: 2)
+                .contentShape(Circle())
+                // 헤드가 손을 따라 움직이므로 움직이지 않는 전역 좌표로 잰다
+                .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .global)
+                    .onChanged { drag in
+                        let start = trayHeadStart ?? trayHeadValue
+                        trayHeadStart = start
+                        tuning.trayHeadDragging = true
+                        trayHeadValue = min(1, max(0, start + drag.translation.width / travel))
+                    }
+                    .onEnded { _ in
+                        trayHeadStart = nil
+                        tuning.trayHeadDragging = false
+                        // 55%를 넘겨 놓으면 오른쪽 끝으로, 아니면 왼쪽 끝으로 돌아간다
+                        withAnimation(.easeIn(duration: 0.22)) { trayHeadValue = trayHeadValue > 0.55 ? 1 : 0 }
+                    })
+        }
+        .frame(width: size, height: size)
+        .offset(x: tuning.trayMargin + gap + trayHeadValue * travel,
+                y: popupSize.height - tuning.trayMargin - tuning.trayHeight + gap)
+        .opacity(shown ? 1 : 0)
+        .allowsHitTesting(shown)
+    }
+
+    /// 지금 시계 자리에 보이는 색. 시계 자리에 무엇을 보일지 고르는 위 규칙과 같은 순서다.
+    /// 시계가 없을 때(일정 없음)는 오른쪽 글과 같은 #ccccdd.
+    private func shownClockColor(_ now: Date) -> (r: Double, g: Double, b: Double) {
+        let start = calendar.next.map { $0.start.addingTimeInterval(CommandLine.arguments.contains("--test-long-countdown") ? 12 * 3600 : 0) }
+        let meetingFirst = start.map { $0.timeIntervalSince(now) <= 10 * 60 && $0.timeIntervalSince(now) > -CalendarFeed.blink } ?? false
+        let timerLeft = tuning.timerEnd?.timeIntervalSince(now)
+        if hoverNow || (tuning.locked && !meetingFirst && timerLeft == nil) { return Self.sky }
+        if !meetingFirst, let left = timerLeft { return clockColor(alert: left <= 5 * 60, left: left) }
+        if GoHome.isTime(now, seconds: GoHome.seconds + 2) && !meetingFirst { return Self.sky }
+        if let start {
+            let left = start.timeIntervalSince(now)
+            return clockColor(alert: left <= 5 * 60 || (left > 10 * 60 - 10 && left <= 10 * 60), left: left)
+        }
+        return (0xcc / 255, 0xcc / 255, 0xdd / 255)
     }
 
     /// 왼쪽 시계와 그 아래 제목. 너비를 고정한 시계는 글자 수가 줄면 커져 아래로 늘어나고 제목은 그만큼 밀린다.
@@ -1025,7 +1080,7 @@ final class SiriDemo: NSObject {
         let homeAlert = GoHome.isTime(Date(), seconds: GoHome.seconds) && !meetingSoon && t.timerEnd == nil
         let alerting = meetingAlert() || timing || homeAlert || choosing
         if alerting && !t.isOpen { t.isOpen = true }
-        let holding = alerting || t.locked || (t.holdWhileSettings && (controlWindow?.isVisible ?? false))
+        let holding = alerting || t.locked || t.trayHeadDragging || (t.holdWhileSettings && (controlWindow?.isVisible ?? false))
         if !holding {
             if t.isOpen {
                 if !keepRect(screen: sf, metrics: metrics, margin: t.keepMargin).contains(mouse) { t.isOpen = false }
@@ -1043,7 +1098,7 @@ final class SiriDemo: NSObject {
         // 열려 있고 마우스가 노치+팝업 위에 있을 때만 클릭을 받는다(설정 아이콘).
         // 패널 창은 1000×620으로 커서, 창 전체가 클릭을 받으면 겹친 설정창의 제목 막대·버튼 클릭까지 가로챈다.
         let overContent = keepRect(screen: sf, metrics: metrics, margin: 0).contains(mouse)
-        panel.ignoresMouseEvents = !(t.isOpen && overContent)
+        panel.ignoresMouseEvents = !(t.isOpen && (overContent || t.trayHeadDragging))
     }
 
     private var alertUntil = Date.distantPast
