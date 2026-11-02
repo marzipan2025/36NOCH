@@ -73,7 +73,12 @@ final class DropTuning: ObservableObject {
 
     /// 바뀔 때마다 패널이 열기/닫기 모션을 한다. 마우스 위치(SiriDemo)나 설정창 버튼이 바꾼다.
     @Published var isOpen = false
-    var trayHeadDragging = false  // 하단 캡슐의 슬라이더 헤드를 끄는 중. 마우스가 노치 밖으로 나가도 닫지 않는다
+    var trayHeadDragging = false  // 하단 캡슐의 슬라이더 헤드를 끄는 중
+    // 슬라이더 헤드 위치이자 화면 어둡기(0 = 왼쪽 끝, 1 = 오른쪽 끝). 저장하지 않는다. 시험용: `--test-dim=0.5`
+    @Published var dimValue: CGFloat = CommandLine.arguments.first { $0.hasPrefix("--test-dim=") }
+        .flatMap { Double($0.dropFirst(11)) }.map { CGFloat($0) } ?? 0
+    /// 타이머 화면으로 낮출지. 화면이 어두운 동안은 슬라이더로 어둠을 끌 수 있게 캡슐과 원래 높이를 둔다.
+    var timerCompact: Bool { timerEnd != nil && dimValue == 0 }
     /// now 버튼을 눌러 잠그면 true: 마우스가 나가도 닫지 않는다. 다시 누르면 풀리고, 그 뒤 마우스가 나가면 닫힌다(저장 안 함).
     @Published var locked = CommandLine.arguments.contains("--test-locked") || CommandLine.arguments.contains("--test-timer")  // 시험용: `--test-open --test-locked`
     /// 잠근 화면의 버튼(+3, +5, :40, :30, :00)으로 건 타이머가 끝나는 시각과 제목. 끝나면(00:00 깜빡임 뒤) 잠금과 함께 풀린다.
@@ -168,8 +173,8 @@ struct DropPanelView: View {
     @State private var inked = true       // 커진 노치가 온통 검정인지. 열릴 때 검정으로 커졌다가 아래쪽이 유리로 걷힌다
     @State private var trayShown = false  // 하단 영역. 팝업 등장이 끝난 뒤에 나타난다
     @State private var sequence: Task<Void, Never>?
-    @State private var trayHeadValue: CGFloat = 0        // 슬라이더 헤드 위치(0 = 왼쪽 끝, 1 = 오른쪽 끝)
     @State private var trayHeadStart: CGFloat?           // 끌기 시작할 때의 위치
+    @State private var trayHeadCancelled = false         // 끄는 중에 노치가 닫혔다. 손을 놓을 때까지 무시한다
 
     // 닫혀 있을 때도 너비를 restWidth만큼 늘여 둘 수 있다(restWide).
     private var notchWidth: CGFloat {
@@ -236,12 +241,19 @@ struct DropPanelView: View {
         }
         // 계정 고르기로 팝업 높이가 바뀔 때 부드럽게. 그림자도 같이 움직이도록 맨 바깥에 건다
         .animation(.spring(duration: 0.45, bounce: 0.15), value: calendar.picking)
-        .animation(.spring(duration: 0.45, bounce: 0.15), value: tuning.timerEnd != nil)  // 타이머: 캡슐을 빼고 그만큼 낮게
+        .animation(.spring(duration: 0.45, bounce: 0.15), value: tuning.timerCompact)  // 타이머: 캡슐을 빼고 그만큼 낮게
         .animation(.spring(duration: 0.45, bounce: 0.15), value: calendar.accounts.count)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onChange(of: tuning.isOpen) { _, open in
             if open { calendar.reload() }
             play(open: open)
+            // 노치가 닫히면 어둠은 부드럽게 걷힌다(오른쪽 끝에서는 닫히지 않는다)
+            if !open {
+                trayHeadCancelled = tuning.trayHeadDragging
+                trayHeadStart = nil
+                tuning.trayHeadDragging = false
+                withAnimation(.easeIn(duration: 0.22)) { tuning.dimValue = 0 }
+            }
         }
         .task {
             // 시험용: `--test-timer-cancel` 이면 5초 뒤 now를 누른 것처럼 타이머만 끈다(`--test-open --test-timer`와 함께)
@@ -357,7 +369,7 @@ struct DropPanelView: View {
                     let color = shownClockColor(context.date)
                     tray(Color(red: color.r, green: color.g, blue: color.b).opacity(tuning.trayOpacity))
                 }
-                .opacity(trayShown && !calendar.picking && tuning.timerEnd == nil ? 1 : 0)
+                .opacity(trayShown && !calendar.picking && !tuning.timerCompact ? 1 : 0)
                 rim
                 // 왼쪽: 남은 시간(금색) 아래에 회의 제목(어두운 금색). 오른쪽: 날짜·시각 두 줄.
                 // 0.5초마다 다시 그린다(남은 시간, 퇴근 알림, 00:00 깜빡임, 콜론 깜빡임).
@@ -473,7 +485,7 @@ struct DropPanelView: View {
         let gap: CGFloat = 4
         let size = max(0, tuning.trayHeight - gap * 2)
         let travel = max(1, popupSize.width - tuning.trayMargin * 2 - gap * 2 - size)
-        let shown = trayShown && !calendar.picking && tuning.timerEnd == nil
+        let shown = trayShown && !calendar.picking && !tuning.timerCompact
         return Color.clear
             .frame(width: size, height: size)
             .glassEffect(.clear, in: Circle())
@@ -481,18 +493,22 @@ struct DropPanelView: View {
             // 헤드가 손을 따라 움직이므로 움직이지 않는 전역 좌표로 잰다
             .gesture(DragGesture(minimumDistance: 0, coordinateSpace: .global)
                 .onChanged { drag in
-                    let start = trayHeadStart ?? trayHeadValue
+                    // 닫힌 뒤 손을 놓는 신호를 못 받았어도 새로 누르면 다시 시작한다
+                    if drag.translation == .zero { trayHeadCancelled = false; trayHeadStart = nil }
+                    guard !trayHeadCancelled else { return }
+                    let start = trayHeadStart ?? tuning.dimValue
                     trayHeadStart = start
                     tuning.trayHeadDragging = true
-                    trayHeadValue = min(1, max(0, start + drag.translation.width / travel))
+                    tuning.dimValue = min(1, max(0, start + drag.translation.width / travel))
                 }
                 .onEnded { _ in
                     trayHeadStart = nil
                     tuning.trayHeadDragging = false
+                    guard !trayHeadCancelled else { trayHeadCancelled = false; return }
                     // 55%를 넘겨 놓으면 오른쪽 끝으로, 아니면 왼쪽 끝으로 돌아간다
-                    withAnimation(.easeIn(duration: 0.22)) { trayHeadValue = trayHeadValue > 0.55 ? 1 : 0 }
+                    withAnimation(.easeIn(duration: 0.22)) { tuning.dimValue = tuning.dimValue > 0.55 ? 1 : 0 }
                 })
-            .offset(x: tuning.trayMargin + gap + trayHeadValue * travel,
+            .offset(x: tuning.trayMargin + gap + tuning.dimValue * travel,
                     y: popupSize.height - tuning.trayMargin - tuning.trayHeight + gap)
             .opacity(shown ? 1 : 0)
             .allowsHitTesting(shown)
@@ -659,7 +675,7 @@ struct DropPanelView: View {
             .frame(width: popupSize.width, height: popupSize.height, alignment: .topLeading)
             .mask {
                 Rectangle()
-                    .overlay { tray(Color.black).opacity(trayShown && !calendar.picking && tuning.timerEnd == nil ? 1 : 0).blendMode(.destinationOut) }
+                    .overlay { tray(Color.black).opacity(trayShown && !calendar.picking && !tuning.timerCompact ? 1 : 0).blendMode(.destinationOut) }
                     .compositingGroup()
             }
             .clipShape(popupShape)
@@ -681,7 +697,7 @@ struct DropPanelView: View {
     /// 흐린 경계가 모양의 아래 모서리 곡선을 따라가므로, 모서리 쪽에서는 검정이 위로 휘어 올라간다.
     private var blackCover: some View {
         // 타이머 중엔 노치가 72 낮아지므로, 검정 아래 끝을 16 더 내려 제목이 검정 위에 오게 한다
-        let lift = tuning.timerEnd != nil && !calendar.picking ? tuning.lift - 16 : tuning.lift
+        let lift = tuning.timerCompact && !calendar.picking ? tuning.lift - 16 : tuning.lift
         // 높이를 고정해 흐린 그림을 다시 그리지 않고 옮기기만 한다. 높이가 바뀌면 흐림을 다시 그리느라
         // 유리보다 늦게 따라와서, 높이가 바뀔 때 유리가 먼저 펴지고 검정이 뒤늦게 바뀌어 보였다.
         let height: CGFloat = 800
@@ -929,6 +945,20 @@ final class SiriDemo: NSObject {
     private let calendar = CalendarFeed()
     private let updates = UpdateFeed()
     private var updateItem: NSMenuItem?
+    private var veils: [NotchPanel] = []  // 화면마다 하나씩, 노치 바로 아래 층에 까는 어둠 창
+    private var veilWatch: AnyCancellable?
+
+    /// 어둠 창을 화면마다 만든다. 클릭은 통과하고, 어두울 때만 띄운다.
+    private func makeVeils() {
+        veils.forEach { $0.orderOut(nil) }
+        veils = NSScreen.screens.map { screen in
+            let veil = NotchPanel(frame: screen.frame)
+            veil.level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue - 1)
+            veil.contentView = NSHostingView(rootView: DimVeil(tuning: tuning))
+            if tuning.dimValue > 0 { veil.orderFrontRegardless() }
+            return veil
+        }
+    }
 
     func start(metrics: NotchMetrics) {
         self.metrics = metrics
@@ -946,6 +976,21 @@ final class SiriDemo: NSObject {
         panel.orderFrontRegardless()
         panel.makeKey()
         self.panel = panel
+        makeVeils()
+        NotificationCenter.default.addObserver(forName: NSApplication.didChangeScreenParametersNotification, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.makeVeils() }
+        }
+        veilWatch = tuning.$dimValue.sink { [weak self] value in
+            guard let self else { return }
+            if value > 0 {
+                self.veils.forEach { $0.orderFrontRegardless() }
+            } else {
+                // 걷히는 모션이 끝난 뒤에 내린다
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.4) {
+                    if self.tuning.dimValue == 0 { self.veils.forEach { $0.orderOut(nil) } }
+                }
+            }
+        }
         calendar.start()
         updates.start()
 
@@ -1078,7 +1123,7 @@ final class SiriDemo: NSObject {
         let homeAlert = GoHome.isTime(Date(), seconds: GoHome.seconds) && !meetingSoon && t.timerEnd == nil
         let alerting = meetingAlert() || timing || homeAlert || choosing
         if alerting && !t.isOpen { t.isOpen = true }
-        let holding = alerting || t.locked || t.trayHeadDragging || (t.holdWhileSettings && (controlWindow?.isVisible ?? false))
+        let holding = alerting || t.locked || t.dimValue >= 1 || (t.holdWhileSettings && (controlWindow?.isVisible ?? false))
         if !holding {
             if t.isOpen {
                 if !keepRect(screen: sf, metrics: metrics, margin: t.keepMargin).contains(mouse) { t.isOpen = false }
@@ -1177,7 +1222,7 @@ extension DropTuning {
     /// 다만 화면 높이의 절반, 그리고 노치 패널(620) 안에 그림자까지 들어가는 높이를 넘지 않는다. 넘치면 목록이 스크롤된다.
     @MainActor
     func popupHeight(calendar: CalendarFeed, metrics: NotchMetrics) -> CGFloat {
-        if timerEnd != nil && !calendar.picking { return popupHeight - trayHeight - 24 }  // 타이머가 도는 동안은 하단 캡슐을 빼고 그 높이 + 24만큼 낮춘다(계정을 고르는 동안은 예외)
+        if timerCompact && !calendar.picking { return popupHeight - trayHeight - 24 }  // 타이머가 도는 동안은 하단 캡슐을 빼고 그 높이 + 24만큼 낮춘다(계정을 고르는 동안은 예외)
         guard calendar.picking, calendar.status != .denied, !calendar.accounts.isEmpty else { return popupHeight }
         let top = contentTop(metrics: metrics) - textTop  // 화면 위 끝 ~ 예전 팝업 위 끝에 해당하는 곳
         let n = CGFloat(calendar.accounts.count)
@@ -1191,6 +1236,24 @@ extension DropTuning {
 }
 
 /// 잠근 화면의 타이머 버튼(글자만). 마우스를 올리면 제목처럼 조금 밝아진다
+/// 슬라이더 값 v만큼 화면을 어둡게 한다: 전체를 검정 v로 덮고, 왼쪽에서 v 너비까지
+/// 검정 → 투명 그라데이션을 불투명도 v로 한 겹 더.
+private struct DimVeil: View {
+    @ObservedObject var tuning: DropTuning
+
+    var body: some View {
+        GeometryReader { geo in
+            ZStack(alignment: .leading) {
+                Color.black.opacity(tuning.dimValue)
+                LinearGradient(colors: [.black, .clear], startPoint: .leading, endPoint: .trailing)
+                    .frame(width: geo.size.width * tuning.dimValue)
+                    .opacity(tuning.dimValue)
+            }
+        }
+        .ignoresSafeArea()
+    }
+}
+
 private struct TimerButton: View {
     let label: String
     let color: Color
