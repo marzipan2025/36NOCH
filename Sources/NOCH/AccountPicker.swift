@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 팝업 안 계정 고르기. 시계 자리(팝업 위쪽)에 맥 캘린더 앱의 계정 목록을 띄우고, 누르면 바로 고른다.
+/// 팝업 안 계정 고르기. 시계 자리(팝업 위쪽)에 맥 캘린더 앱의 계정 목록을 띄우고, 누르면 그 계정의 캘린더 체크 목록으로 넘어간다.
 /// 계정 추가·나중에 같은 버튼은 두지 않는다(나중에 설정에 넣을 것). 팝업 아래 유리는 평소처럼 투명하고,
 /// 계정마다 둥근 검정 상자(0.1, 롤오버 0.8)에 담아서 투명한 곳까지 목록을 내려도 읽힌다.
 struct AccountPicker: View {
@@ -15,6 +15,8 @@ struct AccountPicker: View {
     static let rowGap: CGFloat = 10
     /// 계정 한 줄 높이(이름 + 캘린더 줄 + 위아래 여백). 화면에서 잰 값. 팝업 높이 계산에 쓴다.
     static let rowHeight: CGFloat = 58
+    /// 캘린더 체크 한 줄 높이
+    static let calendarRowHeight: CGFloat = 36
     /// 목록 끝 "Later" 줄 높이(상자 없음)
     static let laterHeight: CGFloat = 42
     /// 상자 안 좌우·위아래 여백
@@ -53,8 +55,15 @@ struct AccountPicker: View {
                 ScrollViewReader { proxy in
                     ScrollView(.vertical, showsIndicators: false) {
                         VStack(alignment: .leading, spacing: Self.rowGap) {
-                            title.padding(.bottom, Self.titleGap - Self.rowGap).id("top")
-                            ForEach(calendar.accounts) { row($0) }
+                            Group {
+                                if calendar.choosingCalendars { backTitle } else { title }
+                            }
+                            .padding(.bottom, Self.titleGap - Self.rowGap).id("top")
+                            if calendar.choosingCalendars {
+                                ForEach(calendar.calendarChoices) { calendarRow($0) }
+                            } else {
+                                ForEach(calendar.accounts) { row($0) }
+                            }
                             laterRow
                         }
                         .padding(.top, topInset)
@@ -89,6 +98,56 @@ struct AccountPicker: View {
             .font(.system(size: textSize, weight: .light))
             .foregroundStyle(Self.light)
             .padding(.leading, Self.innerH)  // 계정 상자 안 글자와 왼쪽을 맞춘다
+    }
+
+    /// 캘린더 체크 단계의 제목. 누르면 계정 목록으로 돌아간다.
+    private var backTitle: some View {
+        Button { calendar.backToAccounts() } label: {
+            HStack(spacing: 5) {
+                Image(systemName: "chevron.left").font(.system(size: textSize - 1, weight: .medium))
+                Text("Choose calendars").font(.system(size: textSize, weight: .light))
+            }
+            .foregroundStyle(hovered == "back" ? Color.white : Self.light)
+            .padding(.leading, Self.innerH)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .focusable(false)
+        .focusEffectDisabled()
+        .onHover { hovered = $0 ? "back" : (hovered == "back" ? nil : hovered) }
+    }
+
+    /// 캘린더 한 칸: 캘린더 앱과 같은 색의 체크 상자 + 이름. 누르면 바로 켜고 끈다.
+    private func calendarRow(_ choice: CalendarFeed.CalendarChoice) -> some View {
+        let color = choice.color.map { Color(cgColor: $0) } ?? Self.dim
+        return Button { calendar.toggle(choice) } label: {
+            HStack(spacing: 9) {
+                ZStack {
+                    RoundedRectangle(cornerRadius: 4)
+                        .fill(choice.on ? color : color.opacity(0.25))
+                    if choice.on {
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundStyle(.white)
+                    }
+                }
+                .frame(width: 16, height: 16)
+                Text(choice.title)
+                    .font(.system(size: textSize + 2, weight: .regular))
+                    .foregroundStyle(choice.on ? Color.white : Self.dim)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+            .padding(.horizontal, Self.innerH)
+            .frame(maxWidth: .infinity, minHeight: Self.calendarRowHeight, alignment: .leading)
+            .background(RoundedRectangle(cornerRadius: 18)
+                .fill(Color.black.opacity(hovered == choice.id ? 0.8 : 0.1)))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .focusable(false)
+        .focusEffectDisabled()
+        .onHover { hovered = $0 ? choice.id : (hovered == choice.id ? nil : hovered) }
     }
 
     /// 목록 맨 끝: 평소엔 상자 없이 "Close" 글자만(검정, 계정 이름과 같은 크기, 세미볼드).

@@ -50,6 +50,14 @@ final class CalendarFeed: ObservableObject {
         let calendars: [String]
     }
 
+    /// 고른 계정 안의 캘린더 하나. 팝업의 체크 목록에 쓴다.
+    struct CalendarChoice: Identifiable, Equatable {
+        let id: String          // EKCalendar.calendarIdentifier. 맥마다 다르다
+        let title: String
+        let color: CGColor?
+        let on: Bool
+    }
+
     @Published private(set) var status: Status = .unknown
     @Published private(set) var today: [Item] = []
     /// 지금 이후 처음 시작하는 회의(종일 일정 제외). 며칠 뒤여도 된다. 남은 시간 표시에 쓴다.
@@ -57,12 +65,23 @@ final class CalendarFeed: ObservableObject {
     /// 팝업에서 계정을 고르는 중인지. 고르는 동안은 마우스와 상관없이 팝업을 열어 둔다.
     @Published private(set) var picking = false
     @Published private(set) var accounts: [Account] = []
+    /// 계정을 고른 뒤 그 계정의 캘린더를 체크하는 단계인지
+    @Published private(set) var choosingCalendars = false
+    @Published private(set) var calendarChoices: [CalendarChoice] = []
     /// 목록 끝 "Later"를 누르면 이번 실행 동안은 계정 고르기를 저절로 띄우지 않는다
     private var pickingDismissed = false
 
     /// 고른 계정(EKSource.sourceIdentifier)을 저장하는 키
     private static let sourceKey = "calendarSourceID"
     var selectedID: String? { UserDefaults.standard.string(forKey: Self.sourceKey) }
+
+    /// 체크를 끈 캘린더(EKCalendar.calendarIdentifier). 끈 것만 저장해서 새로 생긴 캘린더는 켜진 채로 들어온다.
+    /// 캘린더 앱의 체크 상태는 EventKit으로 읽을 수 없어 따로 둔다. 맥마다 따로.
+    private static let offKey = "calendarsOff"
+    private var offIDs: Set<String> {
+        get { Set(UserDefaults.standard.stringArray(forKey: Self.offKey) ?? []) }
+        set { UserDefaults.standard.set(Array(newValue), forKey: Self.offKey) }
+    }
 
     private let store = EKEventStore()
     private var observer: NSObjectProtocol?
@@ -98,9 +117,12 @@ final class CalendarFeed: ObservableObject {
     /// 오늘 남은 일정(지금 진행 중인 것 포함)을 다시 읽는다
     func reload() {
         guard EKEventStore.authorizationStatus(for: .event) == .fullAccess else { return }
-        if picking { loadAccounts() }  // 고르는 중 시스템 설정에서 계정을 넣으면 목록에 바로 나타나게
-        let calendars = accountCalendars()
-        if calendars.isEmpty {
+        if picking {  // 고르는 중 시스템 설정에서 계정을 넣으면 목록에 바로 나타나게
+            loadAccounts()
+            if choosingCalendars { loadCalendarChoices() }
+        }
+        let inAccount = accountCalendars()
+        if inAccount.isEmpty {
             status = .noAccount
             for source in store.sources {
                 say("캘린더: 계정 \(source.title)(\(source.sourceType.rawValue)):",
@@ -110,6 +132,15 @@ final class CalendarFeed: ObservableObject {
             today = []
             next = nil
             offerPicking()
+            return
+        }
+        let off = offIDs
+        let calendars = inAccount.filter { !off.contains($0.calendarIdentifier) }
+        if calendars.isEmpty {  // 계정은 있는데 체크를 모두 껐다. 고르기를 다시 띄우지 않는다.
+            status = .ready
+            today = []
+            next = nil
+            say("캘린더: 체크한 캘린더가 없음")
             return
         }
         let now = Date()
@@ -179,6 +210,7 @@ final class CalendarFeed: ObservableObject {
 
     /// 메뉴의 "캘린더 계정…", 또는 팝업의 안내 글을 눌렀을 때
     func startPicking() {
+        choosingCalendars = false
         if status != .denied { loadAccounts() }
         picking = true
     }
@@ -186,14 +218,40 @@ final class CalendarFeed: ObservableObject {
     /// 목록 끝 "Later": 고르지 않고 닫는다. 메뉴의 "캘린더 계정…"이나 안내 글을 누르면 다시 연다.
     func later() {
         picking = false
+        choosingCalendars = false
         pickingDismissed = true
     }
 
+    /// 계정을 고르면 그 계정의 캘린더 체크 단계로 넘어간다. 끝내는 건 목록 끝 "Close".
     func choose(_ account: Account) {
         UserDefaults.standard.set(account.id, forKey: Self.sourceKey)
-        picking = false
         say("캘린더: \(account.title) 계정을 고름", account.calendars)
+        loadCalendarChoices()
+        choosingCalendars = true
         reload()
+    }
+
+    /// 고른 계정의 캘린더 목록을 다시 읽는다
+    private func loadCalendarChoices() {
+        let source = store.sources.first { $0.sourceIdentifier == selectedID }
+        let off = offIDs
+        calendarChoices = (source?.calendars(for: .event) ?? [])
+            .map { CalendarChoice(id: $0.calendarIdentifier, title: $0.title, color: $0.cgColor, on: !off.contains($0.calendarIdentifier)) }
+            .sorted { $0.title.localizedStandardCompare($1.title) == .orderedAscending }
+    }
+
+    /// 체크를 바꾸면 바로 다시 읽어서 시계에 반영한다
+    func toggle(_ choice: CalendarChoice) {
+        var off = offIDs
+        if choice.on { off.insert(choice.id) } else { off.remove(choice.id) }
+        offIDs = off
+        reload()
+        loadCalendarChoices()
+    }
+
+    func backToAccounts() {
+        choosingCalendars = false
+        loadAccounts()
     }
 
     /// 목록에 없는 계정은 시스템 설정 > 인터넷 계정에서 로그인해 넣는다(맥 기본 기능, 무료). 지금은 계정이 하나도 없을 때의 안내 글에서만 연다.

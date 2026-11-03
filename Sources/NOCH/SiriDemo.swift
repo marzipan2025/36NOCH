@@ -235,6 +235,7 @@ struct DropPanelView: View {
         .animation(.spring(duration: 0.45, bounce: 0.15), value: calendar.picking)
         .animation(.spring(duration: 0.45, bounce: 0.15), value: tuning.timerEnd != nil)  // 타이머: 캡슐을 빼고 그만큼 낮게
         .animation(.spring(duration: 0.45, bounce: 0.15), value: calendar.accounts.count)
+        .animation(.spring(duration: 0.45, bounce: 0.15), value: calendar.choosingCalendars)
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onChange(of: tuning.isOpen) { _, open in
             if open { calendar.reload() }
@@ -1127,11 +1128,13 @@ extension DropTuning {
         if timerEnd != nil && !calendar.picking { return popupHeight - trayHeight - 24 }  // 타이머가 도는 동안은 하단 캡슐을 빼고 그 높이 + 24만큼 낮춘다(계정을 고르는 동안은 예외)
         guard calendar.picking, calendar.status != .denied, !calendar.accounts.isEmpty else { return popupHeight }
         let top = contentTop(metrics: metrics) - textTop  // 화면 위 끝 ~ 예전 팝업 위 끝에 해당하는 곳
-        let n = CGFloat(calendar.accounts.count)
-        let list = 16 + AccountPicker.titleGap + n * AccountPicker.rowHeight + n * AccountPicker.rowGap
+        let checking = calendar.choosingCalendars
+        let n = CGFloat(checking ? calendar.calendarChoices.count : calendar.accounts.count)
+        let row = checking ? AccountPicker.calendarRowHeight : AccountPicker.rowHeight
+        let list = 16 + AccountPicker.titleGap + n * row + n * AccountPicker.rowGap
             + AccountPicker.laterHeight  // 맨 끝 "Later"
-        // 목록이 다 들어가는 높이에서 100 낮춘다. 넘치는 만큼은 안에서 스크롤된다.
-        let needed = textTop + list + 18 - 100
+        // 계정 목록은 다 들어가는 높이에서 100 낮춘다. 넘치는 만큼은 안에서 스크롤된다. 캘린더 체크는 한눈에 보이게 다 넣는다.
+        let needed = textTop + list + 18 - (checking ? 0 : 100)
         let limit = min(metrics.screen.frame.height / 2, 620 - 40) - top
         return max(popupHeight, min(needed, limit))
     }
