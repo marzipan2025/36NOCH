@@ -98,8 +98,11 @@ final class DropTuning: ObservableObject {
     @Published var finaleFade: CGFloat = 0
     /// 노치가 화면 아래 끝까지 이어진 정도(0~1). 시작할 때 약 0.8초 만에 1이 된다
     @Published var finaleReach: CGFloat = 0
-    /// 바닥에 닿은 아래 모서리가 볼록(0)에서 바깥으로 오목하게(1) 녹아 퍼진 정도
+    /// 아래 모서리: 볼록한 모서리가 각지게 줄어든 정도(닿기 직전, 0~1)와 닿은 뒤 바깥으로 오목하게 퍼진 정도(0~1)
+    @Published var finaleSquare: CGFloat = 0
     @Published var finaleMelt: CGFloat = 0
+    /// 옆으로 넓어진 정도(0~1). 다 내려온 직후부터 00:00까지 선형으로 1이 되고, 1이면 화면 너비
+    @Published var finaleWide: CGFloat = 0
     static let finaleSeconds: TimeInterval = 30
     /// 마지막 30초를 누르고 끝낸 회의. 그 회의는 다시 깜빡이거나 붙들지 않는다
     var finaleDismissed: String?
@@ -207,9 +210,16 @@ struct DropPanelView: View {
     /// 노치 전체(닫힘 = 실제 노치 + 좌우로 늘여 둔 만큼, 열림 = 예전 팝업 너비 × 화면 위 끝~예전 팝업 아래 끝).
     /// 이름은 예전 그대로 popupSize·popupShape를 쓴다. popupTop은 늘 0(화면 위 끝).
     private var popupSize: CGSize {
-        grown ? CGSize(width: metrics.width + tuning.growWidth + tuning.popupExtraWidth,
+        grown ? CGSize(width: metrics.width + tuning.growWidth + tuning.popupExtraWidth + finaleWiden,
                        height: tuning.notchBodyHeight(calendar: calendar, metrics: metrics))
               : CGSize(width: notchWidth, height: metrics.height)
+    }
+
+    /// 마지막 30초에 노치가 옆으로 넓어진 양(양쪽 합). 다 내려온 직후부터 00:00까지 선형으로 늘어 화면 너비가 된다.
+    /// 글은 넓어지기 전 자리에 그대로 둔다(글 좌우 여백에 절반씩 더함).
+    private var finaleWiden: CGFloat {
+        let base = metrics.width + tuning.growWidth + tuning.popupExtraWidth
+        return grown ? tuning.finaleWide * max(0, metrics.screen.frame.width - base) : 0
     }
     private var popupTop: CGFloat { 0 }
 
@@ -232,10 +242,9 @@ struct DropPanelView: View {
         let limit = min(size.height / 2, size.width / 2)
         let bottom = min(trayRadius + tuning.trayMargin, limit)  // 하단 캡슐 곡선과 같은 중심
         // 마지막 30초에 화면 아래 끝까지 이어지면 아래 모서리도 위 모서리처럼 바깥으로 오목하게
-        // (바닥에 닿은 뒤에 녹아 퍼진다: finaleMelt)
-        let melt = tuning.finaleMelt
-        return NotchShape(width: size.width, height: size.height, bottomRadius: bottom * (1 - melt),
-                          topRadius: tuning.grownTopRadius, bottomFlare: tuning.grownTopRadius * melt)
+        // (닿기 직전에 볼록한 모서리가 각지게 줄고(finaleSquare), 닿는 순간 바깥으로 퍼진다(finaleMelt))
+        return NotchShape(width: size.width, height: size.height, bottomRadius: bottom * max(0, 1 - tuning.finaleSquare),
+                          topRadius: tuning.grownTopRadius, bottomFlare: tuning.grownTopRadius * tuning.finaleMelt)
     }
 
     /// 하단 캡슐 모서리 반지름(좌우 완전한 반원). 노치 아래 모서리는 이것 + 여백.
@@ -494,7 +503,7 @@ struct DropPanelView: View {
                 } }
                     .font(.system(size: tuning.textSize, weight: .light))
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal, tuning.textPadding + tuning.uiSideInset)  // 노치 좌우 끝에서 trayMargin + 3(하단 캡슐 좌우 끝보다 3 안쪽)
+                    .padding(.horizontal, tuning.textPadding + tuning.uiSideInset + finaleWiden / 2)  // 노치 좌우 끝에서 trayMargin + 3(하단 캡슐 좌우 끝보다 3 안쪽)
                     .padding(.top, tuning.contentTop(metrics: metrics) + tuning.finaleDrop)  // 마지막 30초: 시계 줄이 화면 가운데로 내려온다
                     .opacity(dropped ? 1 : 0)
             }
@@ -604,7 +613,7 @@ struct DropPanelView: View {
     /// 그 밖(MM:SS 등)은 countdownWidth.
     private func clockWidth(for text: String) -> CGFloat {
         guard text.filter({ $0 == ":" }).count == 2 else { return tuning.countdownWidth }
-        let content = popupSize.width - 2 * (tuning.textPadding + tuning.uiSideInset)
+        let content = popupSize.width - finaleWiden - 2 * (tuning.textPadding + tuning.uiSideInset)
         return content - 68
     }
 
@@ -924,8 +933,9 @@ final class SiriDemo: NSObject {
 
     func start(metrics: NotchMetrics) {
         self.metrics = metrics
-        // 슬라이더 최대값과 그림자가 잘리지 않게 넉넉하게 잡는다. 높이는 마지막 30초에 노치가 화면 아래 끝까지 이어지므로 화면 높이
-        let size = CGSize(width: 1000, height: max(620, metrics.screen.frame.height))
+        // 슬라이더 최대값과 그림자가 잘리지 않게 넉넉하게 잡는다. 마지막 30초에 노치가 화면 아래 끝까지 이어지고
+        // 화면 너비까지 넓어지므로(위·아래 오목한 모서리는 화면 밖까지) 화면보다 조금 넓게, 높이는 화면 높이
+        let size = CGSize(width: max(1000, metrics.screen.frame.width + 80), height: max(620, metrics.screen.frame.height))
         let panel = NotchPanel(frame: NotchPanel.topCenterFrame(on: metrics.screen, size: size))
         // 앱이 비활성이어도 활성 모양(유리)으로 그린다. 실제로 효과가 있는 건 NotchPanel의 비공개 메서드 덮어쓰기.
         let root = DropPanelView(metrics: metrics, onSettings: { [weak self] in self?.toggleSettings() },
@@ -1166,15 +1176,34 @@ final class SiriDemo: NSObject {
         let done = min(1, max(0, 1 - left / DropTuning.finaleSeconds))
         t.finale = f
         t.finaleFade = done
-        // 30초가 되는 순간 한 번에(약 1초): 노치는 둥근 아래 끝 그대로 화면 아래 끝까지 늘어나고, 시계 줄은 화면 가운데로 내려온다
-        withAnimation(.spring(duration: 0.8, bounce: 0)) { t.finaleReach = 1 }
-        withAnimation(.spring(duration: 1, bounce: 0)) { t.finaleDrop = maxDrop }
-        // 바닥에 닿으면 둥근 모서리가 녹듯 바닥으로 퍼져 위 모서리처럼 오목해진다
+        // 30초가 되는 순간 한 번에: 노치는 둥근 아래 끝 그대로 화면 아래 끝까지 늘어나고, 시계 줄은 화면 가운데로 내려온다.
+        // 물방울처럼: 정해진 시간에 정확히 바닥에 닿도록, 천천히 출발해 속도가 붙은 채로 닿는 곡선(스프링은 바닥 앞에서 꼬리가 길다)
+        let reach = 0.5  // 1.2 → 0.75 → 0.5: 더 신속하게
+        let fall = (c1: CGPoint(x: 0.45, y: 0), c2: CGPoint(x: 0.8, y: 0.7))
+        // 바닥까지 남은 거리가 3pt가 되는 시각. 그때 바로 퍼지기 시작한다(닿은 뒤 시작하면 머뭇거려 보였다)
+        let distance = metrics.map { $0.screen.frame.height - t.notchBodyHeight(calendar: calendar, metrics: $0) } ?? 0
+        let touch = reach * Self.bezierTime(progress: distance > 3 ? 1 - 3 / distance : 0, c1: fall.c1, c2: fall.c2)
+        withAnimation(.timingCurve(fall.c1.x, fall.c1.y, fall.c2.x, fall.c2.y, duration: reach)) { t.finaleReach = 1 }
+        withAnimation(.timingCurve(0.4, 0, 0.2, 1, duration: reach + 0.2)) { t.finaleDrop = maxDrop }
+        // 볼록한 아래 모서리는 화면 아래 5%에 들어서면 급격히 줄여, 닿을 때는 거의 직각이 되게 한다.
+        // 닿은 뒤에 줄이면 바깥 라운딩이 나오기 전까지 바닥에 붙어 머무르는 것처럼 보였다.
+        let zone = (metrics?.screen.frame.height ?? 0) * 0.05
+        let square = reach * Self.bezierTime(progress: distance > zone ? 1 - zone / distance : 0, c1: fall.c1, c2: fall.c2)
+        DispatchQueue.main.asyncAfter(deadline: .now() + square) {
+            guard t.finale == f else { return }
+            withAnimation(.easeOut(duration: max(0.03, touch - square))) { t.finaleSquare = 1 }
+        }
+        // 닿자마자(3pt 전) 좌우 바깥 모서리가 곧바로 생긴다(살짝 넘쳤다 돌아오며)
+        let melt = 0.12  // 0.3 → 0.18 → 0.12
         meltTask?.cancel()
         meltTask = Task { @MainActor in
-            try? await Task.sleep(for: .seconds(0.7))
+            try? await Task.sleep(for: .seconds(touch))
             guard !Task.isCancelled, t.finale == f else { return }
-            withAnimation(.easeOut(duration: 0.5)) { t.finaleMelt = 1 }
+            withAnimation(.timingCurve(0.05, 1, 0.3, 1.2, duration: melt)) { t.finaleMelt = 1 }
+            // 다 녹아 붙은 뒤부터 00:00까지 어두워지는 것과 함께 조금씩 옆으로 넓어진다
+            try? await Task.sleep(for: .seconds(melt))
+            guard !Task.isCancelled, t.finale == f else { return }
+            withAnimation(.linear(duration: max(0, f.end.timeIntervalSinceNow))) { t.finaleWide = 1 }
         }
         // 노치 윤곽·하단 캡슐은 배경과 함께 남은 시간 동안 서서히 사라진다
         DispatchQueue.main.async {
@@ -1183,6 +1212,19 @@ final class SiriDemo: NSObject {
         dimmer.show(from: done)
     }
     private var meltTask: Task<Void, Never>?
+
+    /// 시간 곡선(cubic bezier, 0~1)에서 진행이 progress가 되는 시간 비율. 진행(y)이 늘기만 하는 곡선일 때만 맞다
+    private static func bezierTime(progress: Double, c1: CGPoint, c2: CGPoint) -> Double {
+        func point(_ u: Double, _ a: Double, _ b: Double) -> Double {
+            3 * (1 - u) * (1 - u) * u * a + 3 * (1 - u) * u * u * b + u * u * u
+        }
+        var lo = 0.0, hi = 1.0
+        for _ in 0..<40 {
+            let mid = (lo + hi) / 2
+            if point(mid, c1.y, c2.y) < progress { lo = mid } else { hi = mid }
+        }
+        return point((lo + hi) / 2, c1.x, c2.x)
+    }
 
     /// 원래대로: 화면을 밝히고 노치를 되돌린다. 타이머는 끄고, 회의는 다시 붙들지 않게 기억한다.
     private func endFinale() {
@@ -1200,6 +1242,8 @@ final class SiriDemo: NSObject {
             t.finaleFade = 0
             t.finaleReach = 0
             t.finaleMelt = 0
+            t.finaleSquare = 0
+            t.finaleWide = 0
         }
         meltTask?.cancel()
         dimmer.hide()
