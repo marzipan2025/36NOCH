@@ -74,11 +74,35 @@ final class DropTuning: ObservableObject {
     /// 바뀔 때마다 패널이 열기/닫기 모션을 한다. 마우스 위치(SiriDemo)나 설정창 버튼이 바꾼다.
     @Published var isOpen = false
     /// now 버튼을 눌러 잠그면 true: 마우스가 나가도 닫지 않는다. 다시 누르면 풀리고, 그 뒤 마우스가 나가면 닫힌다(저장 안 함).
-    @Published var locked = CommandLine.arguments.contains("--test-locked") || CommandLine.arguments.contains("--test-timer")  // 시험용: `--test-open --test-locked`
+    @Published var locked = CommandLine.arguments.contains("--test-locked") || CommandLine.arguments.contains("--test-timer")
+        || CommandLine.arguments.contains("--test-finale")  // 시험용: `--test-open --test-locked`
     /// 잠근 화면의 버튼(+3, +5, :40, :30, :00)으로 건 타이머가 끝나는 시각과 제목. 끝나면(00:00 깜빡임 뒤) 잠금과 함께 풀린다.
     /// 시험용: `--test-timer` 이면 띄우자마자 3분 타이머
-    @Published var timerEnd: Date? = CommandLine.arguments.contains("--test-timer") ? Date().addingTimeInterval(180) : nil
-    var timerTitle = CommandLine.arguments.contains("--test-timer") ? "3-Minute Timer" : ""
+    /// 시험용: `--test-finale` 이면 띄우자마자 65초 타이머(5초 뒤 마지막 30초가 시작된다)
+    @Published var timerEnd: Date? = CommandLine.arguments.contains("--test-timer") ? Date().addingTimeInterval(180)
+        : CommandLine.arguments.contains("--test-finale") ? Date().addingTimeInterval(33) : nil
+    var timerTitle = CommandLine.arguments.contains("--test-timer") ? "3-Minute Timer"
+        : CommandLine.arguments.contains("--test-finale") ? "Finale Test" : ""
+
+    /// 마지막 30초: 타이머든 회의든 30초가 남으면 노치가 곧바로 화면 아래 끝까지 이어지고(아래 모서리도 위처럼 오목하게), 30초에 걸쳐 모든 화면이 어두워지며 시계가 화면 가운데까지 내려온다.
+    /// 00:00이 되면 깜빡이지 않고 그대로 멈춰 있다가, 아무 데나 누르면 원래대로 돌아간다(SiriDemo.updateFinale).
+    struct Finale: Equatable {
+        let end: Date
+        let title: String
+        let side: String          // 오른쪽 두 줄 글
+        let meetingID: String?    // 회의면 일정 ID, 타이머면 nil
+    }
+    @Published var finale: Finale?
+    /// 시계 줄이 더 내려온 양(시작할 때 약 1초)과 노치 윤곽·하단 캡슐이 사라진 정도(0~1, 남은 시간 동안 선형)
+    @Published var finaleDrop: CGFloat = 0
+    @Published var finaleFade: CGFloat = 0
+    /// 노치가 화면 아래 끝까지 이어진 정도(0~1). 시작할 때 약 0.8초 만에 1이 된다
+    @Published var finaleReach: CGFloat = 0
+    /// 바닥에 닿은 아래 모서리가 볼록(0)에서 바깥으로 오목하게(1) 녹아 퍼진 정도
+    @Published var finaleMelt: CGFloat = 0
+    static let finaleSeconds: TimeInterval = 30
+    /// 마지막 30초를 누르고 끝낸 회의. 그 회의는 다시 깜빡이거나 붙들지 않는다
+    var finaleDismissed: String?
 
     /// 12차 설정(= 기본값): 2026-11-02. 11차에서 검정 흐림 37 → 34, 모서리 44 → 34, 양옆 −1 → 0.5, 덧칠 0.65 → 0.7,
     /// 하단 캡슐 여백 36 → 37·불투명도 0.1 → 0.2, 테두리 빛 0.05 → 0.1·굵기 1 → 2·흐림 1 → 3, 그림자 0.3 → 0.4.
@@ -207,7 +231,11 @@ struct DropPanelView: View {
         }
         let limit = min(size.height / 2, size.width / 2)
         let bottom = min(trayRadius + tuning.trayMargin, limit)  // 하단 캡슐 곡선과 같은 중심
-        return NotchShape(width: size.width, height: size.height, bottomRadius: bottom, topRadius: tuning.grownTopRadius)
+        // 마지막 30초에 화면 아래 끝까지 이어지면 아래 모서리도 위 모서리처럼 바깥으로 오목하게
+        // (바닥에 닿은 뒤에 녹아 퍼진다: finaleMelt)
+        let melt = tuning.finaleMelt
+        return NotchShape(width: size.width, height: size.height, bottomRadius: bottom * (1 - melt),
+                          topRadius: tuning.grownTopRadius, bottomFlare: tuning.grownTopRadius * melt)
     }
 
     /// 하단 캡슐 모서리 반지름(좌우 완전한 반원). 노치 아래 모서리는 이것 + 여백.
@@ -305,6 +333,7 @@ struct DropPanelView: View {
         }
         .frame(height: 24)
         .offset(y: y - (24 - d) / 2)
+        .opacity(1 - tuning.finaleFade)  // 마지막 30초에는 노치 윤곽과 함께 사라진다
     }
 
     /// 팝업과 그 유리 컨테이너. 검정 덮개 → 유리 → 글 순으로 쌓는다.
@@ -326,10 +355,11 @@ struct DropPanelView: View {
             popupBlack(opacity: tuning.overBlack)
 
             // 온통 검정: 노치와 같은 검정으로 커졌다가 걷혀 아래쪽 유리가 드러난다.
+            // 마지막 30초에는 다시 서서히 온통 검정이 되어, 다 어두워진 화면과 구분되지 않는다(글만 남는다).
             popupShape.fill(.black)
                 .frame(width: shapeFrameWidth, height: popupSize.height)
                 .offset(y: popupTop)
-                .opacity(inked ? 1 : 0)
+                .opacity(max(inked ? 1 : 0, tuning.finaleFade))
 
             // 위쪽 띠(실제 노치 높이)는 하드웨어 노치와 같은 검정. 그 아래 60에 걸쳐 옅어져
             // 검정 덮개(흐린 경계)로 이어진다. 닫히면 모양 전체가 이 띠 안이라 온통 검정.
@@ -352,8 +382,8 @@ struct DropPanelView: View {
             ZStack(alignment: .topLeading) {
                 // 계정을 고르는 동안은 하단 캡슐(흰 곳)을 없앤다.
                 tray(Color.white.opacity(tuning.trayOpacity))
-                    .opacity(trayShown && !calendar.picking && tuning.timerEnd == nil ? 1 : 0)
-                rim
+                    .opacity(trayShown && !calendar.picking && tuning.timerEnd == nil ? 1 - tuning.finaleFade : 0)
+                rim.opacity(1 - tuning.finaleFade)
                 // 왼쪽: 남은 시간(금색) 아래에 회의 제목(어두운 금색). 오른쪽: 날짜·시각 두 줄.
                 // 0.5초마다 다시 그린다(남은 시간, 퇴근 알림, 00:00 깜빡임, 콜론 깜빡임).
                 // 초 경계에서 시작해 숫자와 콜론이 같은 순간에 바뀌게 한다.
@@ -374,12 +404,22 @@ struct DropPanelView: View {
                     // 시험용: `--test-long-countdown` 이면 회의를 12시간 뒤로 밀어 HH:MM:SS를 보여 준다
                     let start = calendar.next.map { $0.start.addingTimeInterval(CommandLine.arguments.contains("--test-long-countdown") ? 12 * 3600 : 0) }
                     // 우선순위: 10분 이하 남은 회의 > 타이머 > 잠근 지금 시각 > 퇴근 알림 > 그 밖의 회의. now 버튼 롤오버는 늘 지금 시각.
-                    let meetingFirst = start.map { $0.timeIntervalSince(now) <= 10 * 60 && $0.timeIntervalSince(now) > -CalendarFeed.blink } ?? false
+                    // 마지막 30초를 누르고 끝낸 회의는 00:00을 다시 깜빡이지 않는다
+                    let dismissed = calendar.next != nil && calendar.next?.id == tuning.finaleDismissed
+                    let meetingFirst = !dismissed && (start.map { $0.timeIntervalSince(now) <= 10 * 60 && $0.timeIntervalSince(now) > -CalendarFeed.blink } ?? false)
                     let timerLeft = tuning.timerEnd?.timeIntervalSince(now)
-                    let showTimer = !hoverNow && !meetingFirst && timerLeft != nil
-                    let showNow = hoverNow || (tuning.locked && !meetingFirst && timerLeft == nil)
+                    // 마지막 30초 동안은 "지금" 버튼 롤오버를 무시한다
+                    let hovering = hoverNow && tuning.finale == nil
+                    let showTimer = !hovering && !meetingFirst && timerLeft != nil
+                    let showNow = tuning.finale == nil && (hovering || (tuning.locked && !meetingFirst && timerLeft == nil))
                     HStack(alignment: .top) {
-                        if showNow {
+                        if let finale = tuning.finale {
+                            // 마지막 30초: 붉은 남은 시간. 00:00이 되면 깜빡이지 않고 멈춘다
+                            let left = finale.end.timeIntervalSince(now)
+                            let text = countdownText(to: finale.end, now: now)
+                            clockColumn(text: text, title: finale.title, color: clockColor(alert: true, left: left),
+                                        colonBlink: left > 0, now: now, width: clockWidth(for: text))
+                        } else if showNow {
                             // "지금" 버튼 롤오버(또는 눌러서 잠근 동안): 시계 자리에 지금 시각(HH:MM:SS)을 퇴근 알림과 같은 하늘색으로,
                             // 아래에는 타이머 버튼. 잠근 동안만 누를 수 있고, 롤오버만 할 때나 타이머가 도는 중엔 흐리게(0.2) 보여 주기만
                             let text = Self.nowClock(now)
@@ -404,7 +444,7 @@ struct DropPanelView: View {
                             // 10분 전 10초간, 5분 전부터 시작 뒤 00:00을 깜빡이는 10초까지
                             let left = start.timeIntervalSince(now)
                             let alert = left <= 5 * 60 || (left > 10 * 60 - 10 && left <= 10 * 60)
-                            let blinking = left <= 0 && left > -CalendarFeed.blink
+                            let blinking = left <= 0 && left > -CalendarFeed.blink && !dismissed
                             let text = countdownText(to: start, now: now)
                             clockColumn(text: text, title: Self.testTitle ?? calendar.summary,
                                         color: clockColor(alert: alert, left: left),
@@ -422,7 +462,10 @@ struct DropPanelView: View {
                         Spacer(minLength: 0)  // HH:MM:SS는 너비가 정해져 있어 최소 간격은 clockWidth가 정한다
                         // 오른쪽: 날짜·시각 글, 그 아래 "지금" 버튼. 롤오버하는 동안 글은 오늘 요일 / 월 일(하늘색)
                         VStack(alignment: .trailing, spacing: 10) {
-                            if showNow {
+                            if let finale = tuning.finale {
+                                Text(finale.side).multilineTextAlignment(.trailing).fixedSize()
+                                    .foregroundStyle(Color(red: 0xcc / 255, green: 0xcc / 255, blue: 0xdd / 255))
+                            } else if showNow {
                                 Text(Self.nowDay(now)).multilineTextAlignment(.trailing).fixedSize()
                                     .foregroundStyle(Color(red: Self.sky.r, green: Self.sky.g, blue: Self.sky.b))
                             } else if showTimer, let end = tuning.timerEnd {
@@ -452,7 +495,7 @@ struct DropPanelView: View {
                     .font(.system(size: tuning.textSize, weight: .light))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.horizontal, tuning.textPadding + tuning.uiSideInset)  // 노치 좌우 끝에서 trayMargin + 3(하단 캡슐 좌우 끝보다 3 안쪽)
-                    .padding(.top, tuning.contentTop(metrics: metrics))
+                    .padding(.top, tuning.contentTop(metrics: metrics) + tuning.finaleDrop)  // 마지막 30초: 시계 줄이 화면 가운데로 내려온다
                     .opacity(dropped ? 1 : 0)
             }
             .frame(width: popupSize.width, height: popupSize.height, alignment: .topLeading)
@@ -607,7 +650,7 @@ struct DropPanelView: View {
             .frame(width: popupSize.width, height: popupSize.height, alignment: .topLeading)
             .mask {
                 Rectangle()
-                    .overlay { tray(Color.black).opacity(trayShown && !calendar.picking && tuning.timerEnd == nil ? 1 : 0).blendMode(.destinationOut) }
+                    .overlay { tray(Color.black).opacity(trayShown && !calendar.picking && tuning.timerEnd == nil ? 1 - tuning.finaleFade : 0).blendMode(.destinationOut) }
                     .compositingGroup()
             }
             .clipShape(popupShape)
@@ -632,7 +675,8 @@ struct DropPanelView: View {
         let lift = tuning.timerEnd != nil && !calendar.picking ? tuning.lift - 16 : tuning.lift
         // 높이를 고정해 흐린 그림을 다시 그리지 않고 옮기기만 한다. 높이가 바뀌면 흐림을 다시 그리느라
         // 유리보다 늦게 따라와서, 높이가 바뀔 때 유리가 먼저 펴지고 검정이 뒤늦게 바뀌어 보였다.
-        let height: CGFloat = 800
+        // 마지막 30초에 노치가 화면 아래 끝까지 이어져도 위가 비지 않게 넉넉히
+        let height: CGFloat = 1600
         return RoundedRectangle(cornerRadius: tuning.blackRadius)
             .fill(.black)
             .frame(width: max(0, popupSize.width - tuning.sideInset * 2), height: height)
@@ -667,7 +711,7 @@ struct DropPanelView: View {
                     .overlay { shapes.blendMode(.destinationOut) }
                     .compositingGroup()
             }
-            .opacity(dropped ? 1 : 0)
+            .opacity(dropped ? 1 - tuning.finaleFade : 0)
     }
 
     private func play(open: Bool) {
@@ -880,8 +924,8 @@ final class SiriDemo: NSObject {
 
     func start(metrics: NotchMetrics) {
         self.metrics = metrics
-        // 슬라이더 최대값과 그림자가 잘리지 않게 넉넉하게 잡는다.
-        let size = CGSize(width: 1000, height: 620)
+        // 슬라이더 최대값과 그림자가 잘리지 않게 넉넉하게 잡는다. 높이는 마지막 30초에 노치가 화면 아래 끝까지 이어지므로 화면 높이
+        let size = CGSize(width: 1000, height: max(620, metrics.screen.frame.height))
         let panel = NotchPanel(frame: NotchPanel.topCenterFrame(on: metrics.screen, size: size))
         // 앱이 비활성이어도 활성 모양(유리)으로 그린다. 실제로 효과가 있는 건 NotchPanel의 비공개 메서드 덮어쓰기.
         let root = DropPanelView(metrics: metrics, onSettings: { [weak self] in self?.toggleSettings() },
@@ -1019,12 +1063,14 @@ final class SiriDemo: NSObject {
         var timing = false
         if let end = t.timerEnd {
             let left = end.timeIntervalSinceNow
-            if left <= -CalendarFeed.blink { t.timerEnd = nil; t.locked = false } else { timing = left <= 5 * 60 }
+            // 마지막 30초가 붙든 타이머는 누를 때까지 그대로 둔다
+            if left <= -CalendarFeed.blink && t.finale?.end != end { t.timerEnd = nil; t.locked = false } else { timing = left <= 5 * 60 }
         }
+        updateFinale()
         // 퇴근 알림은 우선순위가 가장 낮아, 10분 이하 남은 회의나 타이머가 있으면 열지 않는다
         let meetingSoon = calendar.next.map { $0.start.timeIntervalSinceNow <= 10 * 60 } ?? false
         let homeAlert = GoHome.isTime(Date(), seconds: GoHome.seconds) && !meetingSoon && t.timerEnd == nil
-        let alerting = meetingAlert() || timing || homeAlert || choosing
+        let alerting = meetingAlert() || timing || homeAlert || choosing || t.finale != nil
         if alerting && !t.isOpen { t.isOpen = true }
         let holding = alerting || t.locked || (t.holdWhileSettings && (controlWindow?.isVisible ?? false))
         if !holding {
@@ -1057,8 +1103,10 @@ final class SiriDemo: NSObject {
         let now = Date()
         let left = next.start.timeIntervalSince(now)
         if left <= 0 {
+            // 마지막 30초가 붙들고 있는 동안은 다음 회의로 넘어가지 않는다
+            if tuning.finale?.meetingID == next.id { return false }
             // 시작하면 10초간 00:00을 깜빡이며 열어 두고, 닫힘 모션이 끝난 뒤에 다음 회의로 넘어간다
-            if left > -CalendarFeed.blink { return true }
+            if left > -CalendarFeed.blink && next.id != tuning.finaleDismissed { return true }
             if left <= -CalendarFeed.linger && reloadedAfter != next.id {
                 reloadedAfter = next.id
                 calendar.reload()
@@ -1070,6 +1118,107 @@ final class SiriDemo: NSObject {
             alertUntil = now.addingTimeInterval(10)
         }
         return now < alertUntil || left <= 5 * 60
+    }
+
+    // MARK: 마지막 30초
+
+    private let dimmer = ScreenDimmer()
+    private var finaleDone = false
+    private var clickMonitors: [Any] = []
+
+    /// 타이머나 회의가 finaleSeconds초 남으면 시작하고, 00:00이 되면 누를 때까지 멈춰 둔다.
+    /// 끝나기 전에 타이머를 끄거나 회의가 바뀌면 바로 되돌린다.
+    private func updateFinale() {
+        let t = tuning
+        let now = Date()
+        if let f = t.finale {
+            if now < f.end {
+                let gone = f.meetingID.map { calendar.next?.id != $0 } ?? (t.timerEnd != f.end)
+                if gone { endFinale(); return }
+                // 배경은 남은 시간에 맞춰 매 프레임 조금씩 어두워진다
+                dimmer.level = min(1, max(0, 1 - f.end.timeIntervalSince(now) / DropTuning.finaleSeconds))
+            } else if !finaleDone {
+                dimmer.level = 1
+                finaleDone = true
+                dimmer.acceptsClicks = true
+                watchClicks()
+            }
+            return
+        }
+        var candidates: [DropTuning.Finale] = []
+        if let end = t.timerEnd, end > now, end.timeIntervalSince(now) <= DropTuning.finaleSeconds {
+            let f = DateFormatter()
+            f.dateFormat = "HH:mm:ss"
+            candidates.append(.init(end: end, title: t.timerTitle, side: "Ends at\n" + f.string(from: end), meetingID: nil))
+        }
+        if let next = calendar.next, next.start > now, next.start.timeIntervalSince(now) <= DropTuning.finaleSeconds, next.id != t.finaleDismissed {
+            let when = calendar.nextWhen.map { $0.day + "\n" + $0.time } ?? ""
+            candidates.append(.init(end: next.start, title: calendar.summary, side: when, meetingID: next.id))
+        }
+        guard let f = candidates.min(by: { $0.end < $1.end }), let metrics else { return }
+        startFinale(f, maxDrop: t.finaleMaxDrop(metrics: metrics))
+    }
+
+    private func startFinale(_ f: DropTuning.Finale, maxDrop: CGFloat) {
+        let t = tuning
+        let left = f.end.timeIntervalSinceNow
+        // 30초보다 적게 남아 시작했으면(앱을 그때 켬) 이미 지났어야 할 만큼에서 시작한다
+        let done = min(1, max(0, 1 - left / DropTuning.finaleSeconds))
+        t.finale = f
+        t.finaleFade = done
+        // 30초가 되는 순간 한 번에(약 1초): 노치는 둥근 아래 끝 그대로 화면 아래 끝까지 늘어나고, 시계 줄은 화면 가운데로 내려온다
+        withAnimation(.spring(duration: 0.8, bounce: 0)) { t.finaleReach = 1 }
+        withAnimation(.spring(duration: 1, bounce: 0)) { t.finaleDrop = maxDrop }
+        // 바닥에 닿으면 둥근 모서리가 녹듯 바닥으로 퍼져 위 모서리처럼 오목해진다
+        meltTask?.cancel()
+        meltTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(0.7))
+            guard !Task.isCancelled, t.finale == f else { return }
+            withAnimation(.easeOut(duration: 0.5)) { t.finaleMelt = 1 }
+        }
+        // 노치 윤곽·하단 캡슐은 배경과 함께 남은 시간 동안 서서히 사라진다
+        DispatchQueue.main.async {
+            withAnimation(.linear(duration: left)) { t.finaleFade = 1 }
+        }
+        dimmer.show(from: done)
+    }
+    private var meltTask: Task<Void, Never>?
+
+    /// 원래대로: 화면을 밝히고 노치를 되돌린다. 타이머는 끄고, 회의는 다시 붙들지 않게 기억한다.
+    private func endFinale() {
+        let t = tuning
+        guard let f = t.finale else { return }
+        t.finale = nil
+        if let id = f.meetingID {
+            t.finaleDismissed = id
+        } else if t.timerEnd == f.end {
+            t.timerEnd = nil
+            t.locked = false
+        }
+        withAnimation(.spring(duration: 0.6, bounce: 0.15)) {
+            t.finaleDrop = 0
+            t.finaleFade = 0
+            t.finaleReach = 0
+            t.finaleMelt = 0
+        }
+        meltTask?.cancel()
+        dimmer.hide()
+        finaleDone = false
+        for m in clickMonitors { NSEvent.removeMonitor(m) }
+        clickMonitors = []
+    }
+
+    /// 00:00에 멈춘 뒤 아무 데나 누르면 원래대로. 어두운 화면과 노치는 이 앱의 창이라 앱 안 감시로 잡고(누른 것은 삼킨다),
+    /// 혹시 덮이지 않은 곳은 앱 밖 감시로 잡는다(마우스 누름은 손쉬운 사용 권한이 필요 없다).
+    private func watchClicks() {
+        let mask: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
+        if let local = NSEvent.addLocalMonitorForEvents(matching: mask.union(.keyDown), handler: { [weak self] _ in
+            MainActor.assumeIsolated { self?.endFinale() }
+            return nil
+        }) { clickMonitors.append(local) }
+        if let global = NSEvent.addGlobalMonitorForEvents(matching: mask, handler: { [weak self] _ in
+            MainActor.assumeIsolated { self?.endFinale() }
+        }) { clickMonitors.append(global) }
     }
 
     /// 커진 노치와 팝업(간격 포함)을 감싸는 사각형에 여백을 더한 것, 화면 좌표
@@ -1118,7 +1267,16 @@ extension DropTuning {
     /// 글 틀 위 끝(contentTop)에 맞춰 올려 놓은 높이.
     @MainActor
     func notchBodyHeight(calendar: CalendarFeed, metrics: NotchMetrics) -> CGFloat {
-        contentTop(metrics: metrics) + popupHeight(calendar: calendar, metrics: metrics) - textTop
+        let base = contentTop(metrics: metrics) + popupHeight(calendar: calendar, metrics: metrics) - textTop
+        // 마지막 30초: 화면 아래 끝까지 이어진다
+        return base + finaleReach * max(0, metrics.screen.frame.height - base)
+    }
+
+    /// 마지막 30초 끝에 시계 줄이 더 내려온 양: 시계 숫자의 세로 가운데가 화면 가운데에 오는 만큼
+    func finaleMaxDrop(metrics: NotchMetrics) -> CGFloat {
+        let size = ClockFont.size(for: "00:00", width: countdownWidth)
+        let center = metrics.height + clockGap + size * ClockFont.capHeight / 2
+        return max(0, metrics.screen.frame.height / 2 - center)
     }
 
     /// 지금 팝업 높이. 타이머가 도는 동안은 하단 캡슐 높이만큼 낮게. 캘린더 계정을 고르는 동안은 목록이 다 들어가게 늘린다(아래 여백 18).

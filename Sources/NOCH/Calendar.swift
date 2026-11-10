@@ -344,6 +344,8 @@ enum ClockFont {
     static var descent: CGFloat { -unit.descender }
     /// 프레임 위 ~ 숫자 위 끝(1pt 기준)
     static var capTop: CGFloat { unit.ascender - unit.capHeight }
+    /// 숫자 높이(1pt 기준)
+    static var capHeight: CGFloat { unit.capHeight }
 
     private static func width(_ s: String) -> CGFloat {
         (s as NSString).size(withAttributes: [.font: unit]).width

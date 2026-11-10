@@ -34,15 +34,18 @@ struct NotchShape: Shape {
     var height: CGFloat
     var bottomRadius: CGFloat
     var topRadius: CGFloat
+    /// 화면 아래 끝에 닿았을 때 아래 모서리도 위처럼 바깥으로 오목하게 퍼지는 반지름(마지막 30초). 0이면 볼록한 bottomRadius
+    var bottomFlare: CGFloat = 0
 
-    // 펼침 애니메이션에서 크기와 두 모서리가 부드럽게 바뀌도록
-    var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, AnimatablePair<CGFloat, CGFloat>> {
-        get { AnimatablePair(AnimatablePair(width, height), AnimatablePair(bottomRadius, topRadius)) }
+    // 펼침 애니메이션에서 크기와 모서리들이 부드럽게 바뀌도록
+    var animatableData: AnimatablePair<AnimatablePair<CGFloat, CGFloat>, AnimatablePair<CGFloat, AnimatablePair<CGFloat, CGFloat>>> {
+        get { AnimatablePair(AnimatablePair(width, height), AnimatablePair(bottomRadius, AnimatablePair(topRadius, bottomFlare))) }
         set {
             width = newValue.first.first
             height = newValue.first.second
             bottomRadius = newValue.second.first
-            topRadius = newValue.second.second
+            topRadius = newValue.second.second.first
+            bottomFlare = newValue.second.second.second
         }
     }
 
@@ -55,6 +58,11 @@ struct NotchShape: Shape {
         let bottom = height
         let tr = max(0, topRadius)
         let br = max(0, min(bottomRadius, (right - left) / 2, bottom - tr))
+        let fl = max(0, min(bottomFlare, bottom - tr - br))
+        // 아래 모서리: 옆면에서 r 위부터 꺾여 바닥선의 left + s(오른쪽은 right − s)에서 끝난다.
+        // s가 양수면 볼록(bottomRadius), 음수면 바깥으로 오목(bottomFlare). 둘 사이도 이어지게 한 곡선으로 그린다.
+        let r = br + fl
+        let s = br - fl
 
         var p = Path()
         // 왼쪽 위: 화면 테두리에서 옆면으로 오목하게 꺾임
@@ -62,16 +70,16 @@ struct NotchShape: Shape {
         p.addCurve(to: CGPoint(x: left, y: tr),
                    control1: CGPoint(x: left - tr + tr * k, y: 0),
                    control2: CGPoint(x: left, y: tr - tr * k))
-        p.addLine(to: CGPoint(x: left, y: bottom - br))
+        p.addLine(to: CGPoint(x: left, y: bottom - r))
         // 왼쪽 아래
-        p.addCurve(to: CGPoint(x: left + br, y: bottom),
-                   control1: CGPoint(x: left, y: bottom - br + br * k),
-                   control2: CGPoint(x: left + br - br * k, y: bottom))
-        p.addLine(to: CGPoint(x: right - br, y: bottom))
+        p.addCurve(to: CGPoint(x: left + s, y: bottom),
+                   control1: CGPoint(x: left, y: bottom - r + r * k),
+                   control2: CGPoint(x: left + s - s * k, y: bottom))
+        p.addLine(to: CGPoint(x: right - s, y: bottom))
         // 오른쪽 아래
-        p.addCurve(to: CGPoint(x: right, y: bottom - br),
-                   control1: CGPoint(x: right - br + br * k, y: bottom),
-                   control2: CGPoint(x: right, y: bottom - br + br * k))
+        p.addCurve(to: CGPoint(x: right, y: bottom - r),
+                   control1: CGPoint(x: right - s + s * k, y: bottom),
+                   control2: CGPoint(x: right, y: bottom - r + r * k))
         p.addLine(to: CGPoint(x: right, y: tr))
         // 오른쪽 위
         p.addCurve(to: CGPoint(x: right + tr, y: 0),
@@ -204,5 +212,58 @@ struct NumberField: View {
         if let v = Double(cleaned) {
             value = min(max(CGFloat(v), range.lowerBound), range.upperBound)
         }
+    }
+}
+
+/// 마지막 30초에 모든 화면을 덮는 검정 창. 노치 패널(.screenSaver) 바로 아래 층이라 메뉴 막대까지 덮고 노치는 그 위에 남는다.
+/// 어두워지는 동안은 클릭을 통과시키고, 00:00에 멈춘 뒤에는 클릭을 받아 원래대로 돌리는 신호로 쓴다.
+@MainActor
+final class ScreenDimmer {
+    /// 다 어두워졌을 때의 검정 불투명도. 완전한 검정이라야 같은 검정이 된 노치 윤곽이 사라진다
+    static let darkness: CGFloat = 1
+    private var windows: [NSWindow] = []
+
+    var acceptsClicks = false {
+        didSet { windows.forEach { $0.ignoresMouseEvents = !acceptsClicks } }
+    }
+
+    /// 어두운 정도(0~1). 남은 시간에서 매 프레임(1/60초) 다시 정해서 끊김 없이 이어진다
+    var level: CGFloat = 0 {
+        didSet { windows.forEach { $0.alphaValue = level * Self.darkness } }
+    }
+
+    /// 지금 화면마다 창을 새로 만들어 start(0~1)만큼 어둡게 둔다. 그 뒤로는 level로 어둡게 한다
+    func show(from start: CGFloat) {
+        windows.forEach { $0.orderOut(nil) }
+        windows = NSScreen.screens.map { screen in
+            let w = NSPanel(contentRect: screen.frame, styleMask: [.borderless, .nonactivatingPanel],
+                            backing: .buffered, defer: false)
+            w.isOpaque = false
+            w.backgroundColor = .black
+            w.hasShadow = false
+            w.level = NSWindow.Level(rawValue: NSWindow.Level.screenSaver.rawValue - 1)
+            w.collectionBehavior = [.canJoinAllSpaces, .stationary, .fullScreenAuxiliary, .ignoresCycle]
+            w.animationBehavior = .none
+            w.isReleasedWhenClosed = false
+            w.setFrame(screen.frame, display: false)
+            w.alphaValue = start * Self.darkness
+            w.orderFrontRegardless()
+            return w
+        }
+        acceptsClicks = false
+        level = start
+    }
+
+    /// 0.6초에 걸쳐 밝히고 창을 치운다
+    func hide() {
+        let closing = windows
+        windows = []
+        closing.forEach { $0.ignoresMouseEvents = true }
+        NSAnimationContext.runAnimationGroup({ ctx in
+            ctx.duration = 0.6
+            closing.forEach { $0.animator().alphaValue = 0 }
+        }, completionHandler: {
+            closing.forEach { $0.orderOut(nil) }
+        })
     }
 }
