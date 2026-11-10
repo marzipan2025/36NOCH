@@ -5,6 +5,7 @@ import SwiftUI
 // 검정은 유리 "아래"에 깔아 유리가 그 위에서 굴절·반사하게 하고, 위쪽 띠는 하드웨어 노치와 같은 검정으로 덮는다.
 
 import Combine
+import Carbon.HIToolbox
 
 /// 모든 조절 값. 기본값은 2026-11-02 사용자가 맞춘 12차 설정.
 /// 바꾼 값은 UserDefaults에 저장해서 앱을 다시 켜도 이어진다.
@@ -85,7 +86,7 @@ final class DropTuning: ObservableObject {
         : CommandLine.arguments.contains("--test-finale") ? "Finale Test" : ""
 
     /// 마지막 30초: 타이머든 회의든 30초가 남으면 노치가 곧바로 화면 아래 끝까지 이어지고(아래 모서리도 위처럼 오목하게), 30초에 걸쳐 모든 화면이 어두워지며 시계가 화면 가운데까지 내려온다.
-    /// 00:00이 되면 깜빡이지 않고 그대로 멈춰 있다가, 아무 데나 누르면 원래대로 돌아간다(SiriDemo.updateFinale).
+    /// 00:00이 되면 계속 깜빡이다가, 아무 데나 누르거나 esc를 치면 원래대로 돌아간다(SiriDemo.updateFinale).
     struct Finale: Equatable {
         let end: Date
         let title: String
@@ -103,6 +104,8 @@ final class DropTuning: ObservableObject {
     @Published var finaleMelt: CGFloat = 0
     /// 옆으로 넓어진 정도(0~1). 다 내려온 직후부터 00:00까지 선형으로 1이 되고, 1이면 화면 너비
     @Published var finaleWide: CGFloat = 0
+    /// 실제 노치 좌우 버튼이 사라진 정도(0~1). 노치가 떨어지는 동안 디졸브로 함께 사라진다
+    @Published var finaleButtonsFade: CGFloat = 0
     static let finaleSeconds: TimeInterval = 30
     /// 마지막 30초를 누르고 끝낸 회의. 그 회의는 다시 깜빡이거나 붙들지 않는다
     var finaleDismissed: String?
@@ -342,7 +345,7 @@ struct DropPanelView: View {
         }
         .frame(height: 24)
         .offset(y: y - (24 - d) / 2)
-        .opacity(1 - tuning.finaleFade)  // 마지막 30초에는 노치 윤곽과 함께 사라진다
+        .opacity(1 - tuning.finaleButtonsFade)  // 마지막 30초: 노치가 떨어지는 동안 디졸브로 함께 사라진다
     }
 
     /// 팝업과 그 유리 컨테이너. 검정 덮개 → 유리 → 글 순으로 쌓는다.
@@ -423,10 +426,11 @@ struct DropPanelView: View {
                     let showNow = tuning.finale == nil && (hovering || (tuning.locked && !meetingFirst && timerLeft == nil))
                     HStack(alignment: .top) {
                         if let finale = tuning.finale {
-                            // 마지막 30초: 붉은 남은 시간. 00:00이 되면 깜빡이지 않고 멈춘다
+                            // 마지막 30초: 붉은 남은 시간. 00:00이 되면 누르거나 esc를 칠 때까지 계속 깜빡인다
                             let left = finale.end.timeIntervalSince(now)
                             let text = countdownText(to: finale.end, now: now)
                             clockColumn(text: text, title: finale.title, color: clockColor(alert: true, left: left),
+                                        clockVisible: left > 0 || Int(now.timeIntervalSinceReferenceDate * 2) % 2 == 0,
                                         colonBlink: left > 0, now: now, width: clockWidth(for: text))
                         } else if showNow {
                             // "지금" 버튼 롤오버(또는 눌러서 잠근 동안): 시계 자리에 지금 시각(HH:MM:SS)을 퇴근 알림과 같은 하늘색으로,
@@ -1135,6 +1139,7 @@ final class SiriDemo: NSObject {
     private let dimmer = ScreenDimmer()
     private var finaleDone = false
     private var clickMonitors: [Any] = []
+    private let escKey = EscapeHotKey()
 
     /// 타이머나 회의가 finaleSeconds초 남으면 시작하고, 00:00이 되면 누를 때까지 멈춰 둔다.
     /// 끝나기 전에 타이머를 끄거나 회의가 바뀌면 바로 되돌린다.
@@ -1178,13 +1183,15 @@ final class SiriDemo: NSObject {
         t.finaleFade = done
         // 30초가 되는 순간 한 번에: 노치는 둥근 아래 끝 그대로 화면 아래 끝까지 늘어나고, 시계 줄은 화면 가운데로 내려온다.
         // 물방울처럼: 정해진 시간에 정확히 바닥에 닿도록, 천천히 출발해 속도가 붙은 채로 닿는 곡선(스프링은 바닥 앞에서 꼬리가 길다)
-        let reach = 0.5  // 1.2 → 0.75 → 0.5: 더 신속하게
+        let reach = 0.38  // 1.2 → 0.75 → 0.5 → 0.38: 더 신속하게(0.5에서 30% 빠르게)
         let fall = (c1: CGPoint(x: 0.45, y: 0), c2: CGPoint(x: 0.8, y: 0.7))
         // 바닥까지 남은 거리가 3pt가 되는 시각. 그때 바로 퍼지기 시작한다(닿은 뒤 시작하면 머뭇거려 보였다)
         let distance = metrics.map { $0.screen.frame.height - t.notchBodyHeight(calendar: calendar, metrics: $0) } ?? 0
         let touch = reach * Self.bezierTime(progress: distance > 3 ? 1 - 3 / distance : 0, c1: fall.c1, c2: fall.c2)
         withAnimation(.timingCurve(fall.c1.x, fall.c1.y, fall.c2.x, fall.c2.y, duration: reach)) { t.finaleReach = 1 }
-        withAnimation(.timingCurve(0.4, 0, 0.2, 1, duration: reach + 0.2)) { t.finaleDrop = maxDrop }
+        withAnimation(.timingCurve(0.4, 0, 0.2, 1, duration: (reach + 0.2) / 1.3)) { t.finaleDrop = maxDrop }
+        // 실제 노치 좌우 버튼은 떨어지는 동안 디졸브로 사라진다
+        withAnimation(.easeOut(duration: reach)) { t.finaleButtonsFade = 1 }
         // 볼록한 아래 모서리는 화면 아래 5%에 들어서면 급격히 줄여, 닿을 때는 거의 직각이 되게 한다.
         // 닿은 뒤에 줄이면 바깥 라운딩이 나오기 전까지 바닥에 붙어 머무르는 것처럼 보였다.
         let zone = (metrics?.screen.frame.height ?? 0) * 0.05
@@ -1244,22 +1251,26 @@ final class SiriDemo: NSObject {
             t.finaleMelt = 0
             t.finaleSquare = 0
             t.finaleWide = 0
+            t.finaleButtonsFade = 0
         }
         meltTask?.cancel()
         dimmer.hide()
         finaleDone = false
         for m in clickMonitors { NSEvent.removeMonitor(m) }
         clickMonitors = []
+        escKey.stop()
     }
 
-    /// 00:00에 멈춘 뒤 아무 데나 누르면 원래대로. 어두운 화면과 노치는 이 앱의 창이라 앱 안 감시로 잡고(누른 것은 삼킨다),
+    /// 00:00에 멈춘 뒤 아무 데나 누르거나 esc를 치면 원래대로. 어두운 화면과 노치는 이 앱의 창이라 앱 안 감시로 잡고(누른 것은 삼킨다),
     /// 혹시 덮이지 않은 곳은 앱 밖 감시로 잡는다(마우스 누름은 손쉬운 사용 권한이 필요 없다).
+    /// esc는 이 앱이 앞에 있지 않아도 받도록 그동안만 전역 단축키로 잡는다(단축키 등록도 권한이 필요 없다).
     private func watchClicks() {
         let mask: NSEvent.EventTypeMask = [.leftMouseDown, .rightMouseDown, .otherMouseDown]
-        if let local = NSEvent.addLocalMonitorForEvents(matching: mask.union(.keyDown), handler: { [weak self] _ in
+        if let local = NSEvent.addLocalMonitorForEvents(matching: mask, handler: { [weak self] _ in
             MainActor.assumeIsolated { self?.endFinale() }
             return nil
         }) { clickMonitors.append(local) }
+        escKey.start { [weak self] in self?.endFinale() }
         if let global = NSEvent.addGlobalMonitorForEvents(matching: mask, handler: { [weak self] _ in
             MainActor.assumeIsolated { self?.endFinale() }
         }) { clickMonitors.append(global) }
@@ -1357,5 +1368,36 @@ private struct TimerButton: View {
             .contentShape(Rectangle().inset(by: -4))
             .onHover { hover = $0 }
             .onTapGesture { if enabled { action() } }
+    }
+}
+
+/// esc를 전역 단축키(Carbon RegisterEventHotKey)로 잠깐 잡는다. 잡는 동안 다른 앱에는 esc가 가지 않는다.
+@MainActor
+final class EscapeHotKey {
+    private var ref: EventHotKeyRef?
+    private var handler: EventHandlerRef?
+    private var action: (() -> Void)?
+
+    func start(_ action: @escaping () -> Void) {
+        stop()
+        self.action = action
+        var spec = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        let me = Unmanaged.passUnretained(self).toOpaque()
+        InstallEventHandler(GetApplicationEventTarget(), { _, _, data in
+            guard let data else { return noErr }
+            let hotKey = Unmanaged<EscapeHotKey>.fromOpaque(data).takeUnretainedValue()
+            DispatchQueue.main.async { MainActor.assumeIsolated { hotKey.action?() } }
+            return noErr
+        }, 1, &spec, me, &handler)
+        let id = EventHotKeyID(signature: OSType(0x4E4F4348), id: 1)  // 'NOCH'
+        RegisterEventHotKey(UInt32(kVK_Escape), 0, id, GetApplicationEventTarget(), 0, &ref)
+    }
+
+    func stop() {
+        if let ref { UnregisterEventHotKey(ref) }
+        if let handler { RemoveEventHandler(handler) }
+        ref = nil
+        handler = nil
+        action = nil
     }
 }
