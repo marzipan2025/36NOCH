@@ -107,6 +107,11 @@ final class DropTuning: ObservableObject {
     /// 실제 노치 좌우 버튼이 사라진 정도(0~1). 노치가 떨어지는 동안 디졸브로 함께 사라진다
     @Published var finaleButtonsFade: CGFloat = 0
     static let finaleSeconds: TimeInterval = 30
+    /// 하단 캡슐을 쓸지. v0.1.0에서 임시로 뺐고, v0.1.1부터는 캡슐 없이 늘 타이머 때 높이(캡슐 높이 + 24만큼 낮게)로 연다. 되살리려면 true
+    static let trayEnabled = false
+    /// 캡슐 자리를 빼고 낮춘 노치인지: 타이머가 돌거나 캡슐을 끈 동안(계정을 고르는 동안은 예외)
+    @MainActor
+    func compact(calendar: CalendarFeed) -> Bool { (timerEnd != nil || !Self.trayEnabled) && !calendar.picking }
     /// 마지막 30초를 누르고 끝낸 회의. 그 회의는 다시 깜빡이거나 붙들지 않는다
     var finaleDismissed: String?
 
@@ -196,8 +201,6 @@ struct DropPanelView: View {
     @State private var dropped = false
     @State private var inked = true       // 커진 노치가 온통 검정인지. 열릴 때 검정으로 커졌다가 아래쪽이 유리로 걷힌다
     @State private var trayShown = false  // 하단 영역. 팝업 등장이 끝난 뒤에 나타난다
-    /// 하단 캡슐을 그릴지. v0.1.0에서 임시로 뺐다(자리·크기는 그대로). 되살리려면 true
-    static let trayEnabled = false
     @State private var sequence: Task<Void, Never>?
 
     // 닫혀 있을 때도 너비를 restWidth만큼 늘여 둘 수 있다(restWide).
@@ -396,7 +399,7 @@ struct DropPanelView: View {
             ZStack(alignment: .topLeading) {
                 // 계정을 고르는 동안은 하단 캡슐(흰 곳)을 없앤다.
                 tray(Color.white.opacity(tuning.trayOpacity))
-                    .opacity(Self.trayEnabled && trayShown && !calendar.picking && tuning.timerEnd == nil ? 1 - tuning.finaleFade : 0)
+                    .opacity(DropTuning.trayEnabled && trayShown && !calendar.picking && tuning.timerEnd == nil ? 1 - tuning.finaleFade : 0)
                 rim.opacity(1 - tuning.finaleFade)
                 // 왼쪽: 남은 시간(금색) 아래에 회의 제목(어두운 금색). 오른쪽: 날짜·시각 두 줄.
                 // 0.5초마다 다시 그린다(남은 시간, 퇴근 알림, 00:00 깜빡임, 콜론 깜빡임).
@@ -665,7 +668,7 @@ struct DropPanelView: View {
             .frame(width: popupSize.width, height: popupSize.height, alignment: .topLeading)
             .mask {
                 Rectangle()
-                    .overlay { tray(Color.black).opacity(Self.trayEnabled && trayShown && !calendar.picking && tuning.timerEnd == nil ? 1 - tuning.finaleFade : 0).blendMode(.destinationOut) }
+                    .overlay { tray(Color.black).opacity(DropTuning.trayEnabled && trayShown && !calendar.picking && tuning.timerEnd == nil ? 1 - tuning.finaleFade : 0).blendMode(.destinationOut) }
                     .compositingGroup()
             }
             .clipShape(popupShape)
@@ -687,7 +690,7 @@ struct DropPanelView: View {
     /// 흐린 경계가 모양의 아래 모서리 곡선을 따라가므로, 모서리 쪽에서는 검정이 위로 휘어 올라간다.
     private var blackCover: some View {
         // 타이머 중엔 노치가 72 낮아지므로, 검정 아래 끝을 16 더 내려 제목이 검정 위에 오게 한다
-        let lift = tuning.timerEnd != nil && !calendar.picking ? tuning.lift - 16 : tuning.lift
+        let lift = tuning.compact(calendar: calendar) ? tuning.lift - 16 : tuning.lift
         // 높이를 고정해 흐린 그림을 다시 그리지 않고 옮기기만 한다. 높이가 바뀌면 흐림을 다시 그리느라
         // 유리보다 늦게 따라와서, 높이가 바뀔 때 유리가 먼저 펴지고 검정이 뒤늦게 바뀌어 보였다.
         // 마지막 30초에 노치가 화면 아래 끝까지 이어져도 위가 비지 않게 넉넉히
@@ -1340,7 +1343,7 @@ extension DropTuning {
     /// 다만 화면 높이의 절반, 그리고 노치 패널(620) 안에 그림자까지 들어가는 높이를 넘지 않는다. 넘치면 목록이 스크롤된다.
     @MainActor
     func popupHeight(calendar: CalendarFeed, metrics: NotchMetrics) -> CGFloat {
-        if timerEnd != nil && !calendar.picking { return popupHeight - trayHeight - 24 }  // 타이머가 도는 동안은 하단 캡슐을 빼고 그 높이 + 24만큼 낮춘다(계정을 고르는 동안은 예외)
+        if compact(calendar: calendar) { return popupHeight - trayHeight - 24 }  // 타이머가 도는 동안은 하단 캡슐을 빼고 그 높이 + 24만큼 낮춘다(계정을 고르는 동안은 예외)
         guard calendar.picking, calendar.status != .denied, !calendar.accounts.isEmpty else { return popupHeight }
         let top = contentTop(metrics: metrics) - textTop  // 화면 위 끝 ~ 예전 팝업 위 끝에 해당하는 곳
         let checking = calendar.choosingCalendars
