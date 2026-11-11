@@ -196,6 +196,8 @@ struct DropPanelView: View {
     @State private var dropped = false
     @State private var inked = true       // 커진 노치가 온통 검정인지. 열릴 때 검정으로 커졌다가 아래쪽이 유리로 걷힌다
     @State private var trayShown = false  // 하단 영역. 팝업 등장이 끝난 뒤에 나타난다
+    /// 하단 캡슐을 그릴지. v0.1.0에서 임시로 뺐다(자리·크기는 그대로). 되살리려면 true
+    static let trayEnabled = false
     @State private var sequence: Task<Void, Never>?
 
     // 닫혀 있을 때도 너비를 restWidth만큼 늘여 둘 수 있다(restWide).
@@ -394,7 +396,7 @@ struct DropPanelView: View {
             ZStack(alignment: .topLeading) {
                 // 계정을 고르는 동안은 하단 캡슐(흰 곳)을 없앤다.
                 tray(Color.white.opacity(tuning.trayOpacity))
-                    .opacity(trayShown && !calendar.picking && tuning.timerEnd == nil ? 1 - tuning.finaleFade : 0)
+                    .opacity(Self.trayEnabled && trayShown && !calendar.picking && tuning.timerEnd == nil ? 1 - tuning.finaleFade : 0)
                 rim.opacity(1 - tuning.finaleFade)
                 // 왼쪽: 남은 시간(금색) 아래에 회의 제목(어두운 금색). 오른쪽: 날짜·시각 두 줄.
                 // 0.5초마다 다시 그린다(남은 시간, 퇴근 알림, 00:00 깜빡임, 콜론 깜빡임).
@@ -663,7 +665,7 @@ struct DropPanelView: View {
             .frame(width: popupSize.width, height: popupSize.height, alignment: .topLeading)
             .mask {
                 Rectangle()
-                    .overlay { tray(Color.black).opacity(trayShown && !calendar.picking && tuning.timerEnd == nil ? 1 - tuning.finaleFade : 0).blendMode(.destinationOut) }
+                    .overlay { tray(Color.black).opacity(Self.trayEnabled && trayShown && !calendar.picking && tuning.timerEnd == nil ? 1 - tuning.finaleFade : 0).blendMode(.destinationOut) }
                     .compositingGroup()
             }
             .clipShape(popupShape)
