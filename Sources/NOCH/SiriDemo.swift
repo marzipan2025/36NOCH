@@ -1157,8 +1157,10 @@ final class SiriDemo: NSObject {
                 if gone { endFinale(); return }
                 // 배경은 남은 시간에 맞춰 매 프레임 조금씩 어두워진다
                 dimmer.level = min(1, max(0, 1 - f.end.timeIntervalSince(now) / DropTuning.finaleSeconds))
+                fadeVolume(left: f.end.timeIntervalSince(now))
             } else if !finaleDone {
                 dimmer.level = 1
+                fadeVolume(left: 0)
                 finaleDone = true
                 dimmer.acceptsClicks = true
                 watchClicks()
@@ -1186,6 +1188,8 @@ final class SiriDemo: NSObject {
         let done = min(1, max(0, 1 - left / DropTuning.finaleSeconds))
         t.finale = f
         t.finaleFade = done
+        volumeStart = SystemVolume.get()
+        lastVolume = nil
         // 30초가 되는 순간 한 번에: 노치는 둥근 아래 끝 그대로 화면 아래 끝까지 늘어나고, 시계 줄은 화면 가운데로 내려온다.
         // 물방울처럼: 정해진 시간에 정확히 바닥에 닿도록, 천천히 출발해 속도가 붙은 채로 닿는 곡선(스프링은 바닥 앞에서 꼬리가 길다)
         let reach = 0.38  // 1.2 → 0.75 → 0.5 → 0.38: 더 신속하게(0.5에서 30% 빠르게)
@@ -1225,6 +1229,23 @@ final class SiriDemo: NSObject {
     }
     private var meltTask: Task<Void, Never>?
 
+    /// 마지막 30초를 시작할 때의 맥 출력 볼륨과 마지막으로 정한 볼륨
+    private var volumeStart: Float?
+    private var lastVolume: Float?
+    /// 이만큼 남으면 소리가 완전히 꺼진다
+    private static let silentAt: TimeInterval = 3
+
+    /// 노치가 옆으로 넓어지는 것과 같이 남은 시간에 비례해 맥 출력 볼륨을 줄여, silentAt초 남았을 때 0이 되게 한다.
+    /// 매 프레임 부르지만 바뀐 만큼이 작으면 건너뛴다.
+    private func fadeVolume(left: TimeInterval) {
+        guard let start = volumeStart else { return }
+        let k = Float(min(1, max(0, (left - Self.silentAt) / (DropTuning.finaleSeconds - Self.silentAt))))
+        let v = start * k
+        if let last = lastVolume, abs(last - v) < 0.004, v > 0 || last == 0 { return }
+        lastVolume = v
+        SystemVolume.set(v)
+    }
+
     /// 시간 곡선(cubic bezier, 0~1)에서 진행이 progress가 되는 시간 비율. 진행(y)이 늘기만 하는 곡선일 때만 맞다
     private static func bezierTime(progress: Double, c1: CGPoint, c2: CGPoint) -> Double {
         func point(_ u: Double, _ a: Double, _ b: Double) -> Double {
@@ -1260,6 +1281,9 @@ final class SiriDemo: NSObject {
         }
         meltTask?.cancel()
         dimmer.hide()
+        // 00:00 전에 끝났으면(타이머를 끄거나 회의가 바뀜) 볼륨을 처음대로. 00:00까지 갔으면 줄인 채로 둔다
+        if !finaleDone, let v = volumeStart { SystemVolume.set(v) }
+        volumeStart = nil
         finaleDone = false
         for m in clickMonitors { NSEvent.removeMonitor(m) }
         clickMonitors = []
